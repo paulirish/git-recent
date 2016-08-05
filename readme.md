@@ -1,4 +1,4 @@
-# git-open
+# git-recent
 
 Type `git recent` to see your latest local git branches
 
@@ -13,11 +13,11 @@ Type `git recent` to see your latest local git branches
 ### Installation
 
 You can add the `git-recent` location o your path (e.g. add the directory to your `PATH` environment
-or copy `git-open` into an existing included path like `/usr/local/bin` or `~/bin/`).
+or copy `git-recent` into an existing included path like `/usr/local/bin` or `~/bin/`).
 
 You can use also `npm` to install the global binary:
 
-    npm install --global git-open
+    npm install --global git-recent
 
 ## License
 
