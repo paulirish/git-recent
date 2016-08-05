@@ -1,0 +1,30 @@
+#!/bin/bash
+
+##
+## git-recent
+##
+## list all local branches, sorted by last commit, formatted reall purdy
+##
+
+format="\
+%(HEAD) %(color:yellow)%(refname:short)%(color:reset)|\
+%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname)%0a\
+  %(color:black) %(color:reset)|%(contents:subject)%0a\
+  |"
+
+lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
+
+git for-each-ref \
+    --sort=-committerdate \
+    "refs/heads/"  \
+    --format="$format" \
+  | column -ts '|'  \
+  | less "$lessopts"
+
+# The above command:
+#   for all known branches,
+#   sort descending by last commit
+#   show local branches (change to "" to include both local + remote branches)
+#   apply the formatting template above
+#   break into columns
+#   use the pager only if there's not enough space

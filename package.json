@@ -1,0 +1,25 @@
+{
+  "name": "git-recent",
+  "version": "1.0.0",
+  "description": "List recent git branches, formatted so fancy",
+  "bin": {
+    "git-recent": "git-recent"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulirish/git-recent.git"
+  },
+  "keywords": [
+    "git",
+    "branches"
+  ],
+  "author": "Paul Irish",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/paulirish/git-recent/issues"
+  },
+  "homepage": "https://github.com/paulirish/git-recent#readme"
+}
