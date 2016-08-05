@@ -19,6 +19,11 @@ You can use also `npm` to install the global binary:
 
     npm install --global git-recent
 
+## If you like this you may also be interested in...
+
+- [`git open`](https://github.com/paulirish/git-open) - Open the repo website in your browser
+- [`diff-so-fancy`](https://github.com/so-fancy/diff-so-fancy/) - Making the output of `git diff` so fancy
+
 ## License
 
 Copyright Paul Irish. Licensed under MIT.
