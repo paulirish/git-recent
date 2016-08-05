@@ -17,7 +17,7 @@ or copy `git-open` into an existing included path like `/usr/local/bin` or `~/bi
 
 You can use also `npm` to install the global binary:
 
-    npm install --global git-open
+    npm install --global git-recent
 
 ## License
 
