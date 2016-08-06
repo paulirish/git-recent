@@ -1,30 +1,75 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-##
-## git-recent
-##
-## list all local branches, sorted by last commit, formatted reall purdy
-##
+current_branch_name=$(git rev-parse --abbrev-ref HEAD)
 
-format="\
-%(HEAD) %(color:yellow)%(refname:short)%(color:reset)|\
-%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname)%0a\
-  %(color:black) %(color:reset)|%(contents:subject)%0a\
-  |"
+branch_color=$(tput setaf 3)
+error_color=$(tput setaf 8)
+current_branch_color=$(tput setaf 2)
+head_color=$(tput setaf 5)
+remote_color=$(tput setaf 6)
+reset=$(tput sgr0)
+bold=$(tput bold)
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
-git for-each-ref \
-    --sort=-committerdate \
-    "refs/heads/"  \
-    --format="$format" \
-  | column -ts '|'  \
-  | less "$lessopts"
+get_ahead_behind ()
+{
+  local color=$1
+  local from_branch=$2
+  local to_branch=$3
+
+  local ahead=$(git rev-list $to_branch..$from_branch|wc -l|tr -d ' ')
+  local behind=$(git rev-list $from_branch..$to_branch|wc -l|tr -d ' ')
+
+  if [ $behind = 0 ]; then
+    if [ $ahead = 0 ]; then
+      echo "$color[up to date with $to_branch]"
+    else
+      echo "$color["$ahead"↑ $to_branch]"
+    fi
+  else
+    if [ $ahead = 0 ]; then
+      echo "$color["$behind"↓ $to_branch]"
+    else
+      echo "$color["$ahead"↑ "$behind"↓ $to_branch]"
+    fi
+  fi
+}
+
+for branch_name in $(git for-each-ref --format='%(refname:short)' --sort=-committerdate refs/heads)
+do
+  # get ↑s and ↓s of each branch
+  remote_branch=$(git for-each-ref --format='%(upstream:short)' refs/heads/$branch_name)
+
+  if [ $branch_name = $current_branch_name ]; then
+    branch="$current_branch_color$branch_name $current_branch_color"
+  else
+    branch="$branch_color$branch_name $(get_ahead_behind $head_color $branch_name $current_branch_name)"
+  fi
+
+  info=$(git show "$branch_name" --format="%Cred%h%Creset %Cgreen(%cr)%Creset" -s)
+  msg=$(git show "$branch_name" --format="%Cblue%an%Creset %s" -s)
+
+  if [[ -n $remote_branch ]]; then
+    git show-ref --verify --quiet refs/remotes/$remote_branch
+    if [ $? = 0 ]; then
+      remote="$(get_ahead_behind $remote_color $branch_name $remote_branch)"
+    else
+      remote="$error_color[Upstream $remote_branch not found]"
+    fi
+  else
+    remote="$error_color[No upstream]"
+  fi
+
+  output="$output\n$branch|$bold$info$reset|$remote\n$msg"
+done
+
+echo -e "$output" | column -ts '|' | less "$lessopts"
 
 # The above command:
 #   for all known branches,
 #   sort descending by last commit
-#   show local branches (change to "" to include both local + remote branches)
+#   get branch information
 #   apply the formatting template above
 #   break into columns
 #   use the pager only if there's not enough space
