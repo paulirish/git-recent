@@ -23,7 +23,7 @@ get_ahead_behind ()
 
   if [ $behind = 0 ]; then
     if [ $ahead = 0 ]; then
-      echo "$color[up to date with $to_branch]"
+      echo "$color[$to_branch]"
     else
       echo "$color["$ahead"↑ $to_branch]"
     fi
@@ -42,7 +42,7 @@ do
   remote_branch=$(git for-each-ref --format='%(upstream:short)' refs/heads/$branch_name)
 
   if [ $branch_name = $current_branch_name ]; then
-    branch="$current_branch_color$branch_name $current_branch_color"
+    branch="$current_branch_color$branch_name$reset"
   else
     branch="$branch_color$branch_name $(get_ahead_behind $head_color $branch_name $current_branch_name)"
   fi
