@@ -8,7 +8,7 @@
 
 format="\
 %(HEAD) %(color:yellow)%(refname:short)%(color:reset)|\
-%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:green)%(upstream:track)%0a\
+%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:reset)%(color:yellow)%(upstream:track)%0a\
   %(color:black) %(color:reset)|%(contents:subject)%0a\
   |"
 
