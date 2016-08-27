@@ -12,6 +12,14 @@ format="\
   %(color:black) %(color:reset)|%(contents:subject)%0a\
   |"
 
+## workaround for Windows (#8)
+if [ "$(uname -o)" == "Msys" ]; then
+  format="\
+%(HEAD) %(refname:short)|\
+%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:reset)%(color:yellow)%(upstream:track)%0a\
+|%(contents:subject)%0a"
+fi
+
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
 git for-each-ref \
