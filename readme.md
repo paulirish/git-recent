@@ -9,6 +9,7 @@ Type `git recent` to see your latest local git branches
 
 ![git-recent screenshot](https://cloud.githubusercontent.com/assets/39191/17446638/039d4cee-5aff-11e6-9e11-4294f0020513.png)
 
+If you're a Windows user, you need to use [Git Bash](https://git-scm.com/downloads) or similar shell in order to effectively use this utility. 
 
 ### Installation
 
