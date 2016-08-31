@@ -6,19 +6,25 @@
 ## list all local branches, sorted by last commit, formatted reall purdy
 ##
 
-format="\
-%(HEAD) %(color:yellow)%(refname:short)%(color:reset)|\
-%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:reset)%(color:yellow)%(upstream:track)%0a\
-  %(color:black) %(color:reset)|%(contents:subject)%0a\
-  |"
-
-## workaround for Windows (#8)
-if [ "$(uname -o)" == "Msys" ]; then
-  format="\
-%(HEAD) %(refname:short)|\
-%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:reset)%(color:yellow)%(upstream:track)%0a\
-|%(contents:subject)%0a"
+# Msys needs more basic format (git-for-windows/git#865)
+if [ "$(uname -o)" != "Msys" ]; then
+  branch='%(color:yellow)%(refname:short)%(color:reset)'
+  spacer='%(color:black) %(color:reset)'
+else
+  branch='%(refname:short)'
+  spacer=' '
 fi
+
+format="\
+%(HEAD) \
+$branch|\
+%(color:bold red)%(objectname:short)%(color:reset) \
+%(color:bold green)(%(committerdate:relative))%(color:reset) \
+%(color:bold blue)%(authorname)%(color:reset) \
+%(color:yellow)%(upstream:track)%(color:reset)
+$spacer|\
+%(contents:subject)
+|"
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
