@@ -24,7 +24,7 @@ $branch|\
 %(color:yellow)%(upstream:track)%(color:reset)
 $spacer|\
 %(contents:subject)
-|"
+$spacer|"
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
