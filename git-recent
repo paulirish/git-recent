@@ -6,14 +6,17 @@
 ## list all local branches, sorted by last commit, formatted reall purdy
 ##
 
-# Msys needs more basic format (git-for-windows/git#865)
-if [ "$(uname -o)" != "Msys" ]; then
-  branch='%(color:yellow)%(refname:short)%(color:reset)'
-  spacer='%(color:black) %(color:reset)'
-else
-  branch='%(refname:short)'
-  spacer=' '
-fi
+# Windows needs more basic format (#8, git-for-windows/git#865)
+case $(uname -s) in
+  CYGWIN*|MINGW32*|MSYS*)
+    branch='%(refname:short)'
+    spacer=' '
+    ;;
+  *)
+    branch='%(color:yellow)%(refname:short)%(color:reset)'
+    spacer='%(color:black) %(color:reset)'
+    ;;
+esac
 
 format="\
 %(HEAD) \
