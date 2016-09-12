@@ -1,6 +1,6 @@
 {
   "name": "git-recent",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "List recent git branches, formatted so fancy",
   "bin": {
     "git-recent": "git-recent"
