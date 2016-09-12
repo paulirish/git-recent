@@ -6,11 +6,28 @@
 ## list all local branches, sorted by last commit, formatted reall purdy
 ##
 
+# Windows needs more basic format (#8, git-for-windows/git#865)
+case $(uname -s) in
+  CYGWIN*|MINGW32*|MSYS*)
+    branch='%(refname:short)'
+    spacer=' '
+    ;;
+  *)
+    branch='%(color:yellow)%(refname:short)%(color:reset)'
+    spacer='%(color:black) %(color:reset)'
+    ;;
+esac
+
 format="\
-%(HEAD) %(color:yellow)%(refname:short)%(color:reset)|\
-%(color:bold red)%(objectname:short) %(color:bold green)(%(committerdate:relative)) %(color:blue)%(authorname) %(color:reset)%(color:yellow)%(upstream:track)%0a\
-  %(color:black) %(color:reset)|%(contents:subject)%0a\
-  |"
+%(HEAD) \
+$branch|\
+%(color:bold red)%(objectname:short)%(color:reset) \
+%(color:bold green)(%(committerdate:relative))%(color:reset) \
+%(color:bold blue)%(authorname)%(color:reset) \
+%(color:yellow)%(upstream:track)%(color:reset)
+$spacer|\
+%(contents:subject)
+$spacer|"
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
