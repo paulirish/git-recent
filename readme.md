@@ -7,9 +7,13 @@ Type `git recent` to see your latest local git branches
     git recent
 
 
+Optionally add `-n <int>` to see the most recent `<n>` branches
+
+    git recent -n 5
+
 ![git-recent screenshot](https://cloud.githubusercontent.com/assets/39191/17446638/039d4cee-5aff-11e6-9e11-4294f0020513.png)
 
-If you're a Windows user, you need to use [Git Bash](https://git-scm.com/downloads) or similar shell in order to effectively use this utility. 
+If you're a Windows user, you need to use [Git Bash](https://git-scm.com/downloads) or similar shell in order to effectively use this utility.
 
 ### Installation
 
@@ -19,7 +23,7 @@ or copy `git-recent` into an existing included path like `/usr/local/bin` or `~/
 You can use also `npm` to install the global binary:
 
     npm install --global git-recent
-    
+
 On Mac, you can install with homebrew:
 
     brew install git-recent
