@@ -32,6 +32,7 @@ $spacer|"
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
 git for-each-ref \
+    --color=always \
     --sort=-committerdate \
     "refs/heads/"  \
     --format="$format" \
@@ -40,6 +41,7 @@ git for-each-ref \
 
 # The above command:
 #   for all known branches,
+#   (force coloring on this, especially since it's being piped)
 #   sort descending by last commit
 #   show local branches (change to "" to include both local + remote branches)
 #   apply the formatting template above
