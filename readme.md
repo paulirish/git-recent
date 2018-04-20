@@ -19,6 +19,10 @@ or copy `git-recent` into an existing included path like `/usr/local/bin` or `~/
 You can use also `npm` to install the global binary:
 
     npm install --global git-recent
+    
+On Mac, you can install with homebrew:
+
+    brew install git-recent
 
 ## If you like this you may also be interested in...
 
