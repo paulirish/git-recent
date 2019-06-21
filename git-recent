@@ -18,6 +18,7 @@ case $(uname -s) in
     ;;
 esac
 
+COUNT=0
 while getopts "n:" opt; do
   case ${opt} in
     n )
