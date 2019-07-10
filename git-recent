@@ -6,15 +6,17 @@
 ## list all local branches, sorted by last commit, formatted reall purdy
 ##
 
-# Windows needs more basic format (#8, git-for-windows/git#865)
+branch='%(color:yellow)%(refname:short)%(color:reset)'
+spacer='%(color:black) %(color:reset)'
+
 case $(uname -s) in
+  # As of Windows 10 1903 (May 2019 Update) `column -ts` works as expected
+  MINGW64_NT-10.0-18362*);;
+
+  # Other Windows versions need more basic format (#8, git-for-windows/git#865)
   CYGWIN*|MINGW*|MSYS*)
     branch='%(refname:short)'
     spacer=' '
-    ;;
-  *)
-    branch='%(color:yellow)%(refname:short)%(color:reset)'
-    spacer='%(color:black) %(color:reset)'
     ;;
 esac
 
