@@ -41,15 +41,14 @@ else
 fi
 
 format="\
-%(HEAD) \
-$branch|\
-%(color:bold red)%(objectname:short)%(color:reset) \
+$branch %(HEAD)\
+
+    %(color:bold red)%(objectname:short)%(color:reset) \
 %(color:bold green)(%(committerdate:relative))%(color:reset) \
 %(color:bold blue)%(authorname)%(color:reset) \
 $upstream_deets
-$spacer|\
-%(contents:subject)
-$spacer|"
+    %(contents:subject)
+"
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
@@ -59,7 +58,6 @@ git for-each-ref \
     --sort=-committerdate \
     "refs/heads/"  \
     --format="$format" \
-  | column -ts '|'  \
   | less "$lessopts"
 
 # The above command:
