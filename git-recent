@@ -18,20 +18,43 @@ case $(uname -s) in
     ;;
 esac
 
+function ensure_integer() {
+  if ! [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
+    echo "error: -n requires an integer argument."
+    exit 1
+  fi
+}
+
+function usage() {
+  echo "Usage: git recent [-n <num> | -<num>]"
+  echo "  List latest local git branches, formatted real fancy."
+}
+
 COUNT=0
-while getopts "n:" opt; do
-  case ${opt} in
-    n )
-      if ! [[ $OPTARG =~ ^[0-9]{1,}$ ]]; then
-        echo "-n should be an integer."
-        exit 1
-      fi
-      COUNT=${OPTARG}
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n )
+      COUNT="$2"
+      ensure_integer "$COUNT"
       shift
       ;;
+    -[1-9]* | -n[1-9]* )
+      COUNT="${1#-}"
+      COUNT="${COUNT#n}"
+      ensure_integer "$COUNT"
+      ;;
+    -h | --h* )
+      usage
+      exit 0
+      ;;
+    * )
+      echo "error: unknown argument '$1'"
+      usage
+      exit 1
+      ;;
   esac
+  shift
 done
-shift $((OPTIND-1))
 
 format="\
 %(HEAD) \
@@ -48,7 +71,7 @@ lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
 git for-each-ref \
     --color=always \
-    --count=$COUNT \
+    --count="$COUNT" \
     --sort=-committerdate \
     "refs/heads/"  \
     --format="$format" \
