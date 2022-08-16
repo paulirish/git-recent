@@ -32,7 +32,8 @@ while getopts "n:" opt; do
 done
 shift $((OPTIND-1))
 
-## dont collect upstream details ([ahead 2, behind 54]) for big-ass git repos, it adds >5s. 
+# Dont collect upstream details ([ahead 2, behind 54]) for big-ass git repos. It's slow.
+# git count-objects -v | grep -- "in-pack" | cut -d " " -f 2
 # TODO, use `git count-objects -v` and consider `in-pack` and `size-pack` instead of special casing chromium
 if git config --get remote.origin.url | grep -q chromium.googlesource.com; then
     upstream_deets=""
