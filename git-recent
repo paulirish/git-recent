@@ -10,11 +10,9 @@
 case $(uname -s) in
   CYGWIN*|MINGW*|MSYS*)
     branch='%(refname:short)'
-    spacer=' '
     ;;
   *)
     branch='%(color:yellow)%(refname:short)%(color:reset)'
-    spacer='%(color:black) %(color:reset)'
     ;;
 esac
 
@@ -39,10 +37,8 @@ $branch|\
 %(color:bold red)%(objectname:short)%(color:reset) \
 %(color:bold green)(%(committerdate:relative))%(color:reset) \
 %(color:bold blue)%(authorname)%(color:reset) \
-%(color:yellow)%(upstream:track)%(color:reset)
-$spacer|\
-%(contents:subject)
-$spacer|"
+%(color:yellow)%(upstream:track)%(color:reset) \
+%(contents:subject)"
 
 lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
 
