@@ -21,8 +21,8 @@ git for-each-ref --color=always --sort=-committerdate "refs/heads/"  --format="$
       --layout=reverse --multi --height=90% --min-height=20  \
       --border-label-pos=2 --border-label '🌲 Branches' --border \
       --no-hscroll --no-multi \
-      --preview-window='right,80%,border-left,border-rounded' --preview="$diffcommits_cmd" --preview-label="Commits unique to branch" \
-      --header $'CTRL-O (show branch diff)\n\n' \
+      --preview-window='right,70%,border-left,border-rounded' --preview="$diffcommits_cmd" --preview-label="Commits unique to branch" \
+      --header $'CTRL-O (branch diff)\n\n' \
       --bind "ctrl-o:execute:$diffbranch_cmd"
 
 # Checkout the selected item
