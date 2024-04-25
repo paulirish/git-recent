@@ -2,6 +2,12 @@
 #!/bin/bash
 
 # git recent but with a FZF preview of the branch diff.
+# run this somewhere:
+#     bind \cb git-recent-with-fzf-and-diff
+# then do
+#     git checkout CTRL-B
+
+
 
 branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
@@ -25,6 +31,3 @@ git for-each-ref --color=always --sort=-committerdate "refs/heads/"  --format="$
       --header $'CTRL-O (branch diff)\n\n' \
       --bind "ctrl-o:execute:$diffbranch_cmd"
 
-# Checkout the selected item
-# git checkout (echo $target | awk '{print $2}') 
-  
