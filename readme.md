@@ -7,7 +7,7 @@ Type `git recent` to see your latest local git branches
     git recent
 
 
-Optionally, add `-n<int>` to see the most recent `<n>` branches
+Optionally, add `-n<num>` or `-<num>` to see only the `<num>` most recent branches:
 
     git recent -n5
 
