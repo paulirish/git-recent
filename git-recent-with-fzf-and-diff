@@ -16,7 +16,7 @@ branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
 mainormaster() {
-  git branch --format '%(refname:short)' --sort=-committerdate --list master main | head -n1
+  (git branch --format '%(refname:short)' --sort=-committerdate --list master main; echo main) | head -n1 || echo main
 }
 
 stat_cmd="git diff --color=always --stat origin/$(mainormaster)...{}"
@@ -32,7 +32,7 @@ diffbranch_cmd="git diff origin/$(mainormaster)...{} | delta"
 _browse_branches() {
   local preview_cmd="$diffcommits_cmd"  # Default preview: commit log
 
-  git for-each-ref --color=always --sort=-committerdate "refs/heads/" --format="$branches_format" \
+  git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
     |  fzf-tmux  --ansi  -p80%,60%  -- \
         --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
