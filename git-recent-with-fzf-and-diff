@@ -1,25 +1,22 @@
-
 #!/bin/bash
 
 #
-# git recent upgraded. lists unique commits to that branch. and the branch diff.
+# git recent 2.0 - switching branches, but so fancy
 #
-#  run it:
-#     git recent-with-fzf-and-diff # or alias it
-#  then within it
-#     `ctrl-o` to show the diff of that branch against the origin/main (or origin/master) 
-#     `enter` to git checkout that branch
+# - view recently edited local branches
+# - see unique commits to that branch, and optionally the branch diff (against the main/master/primary branch) with Ctrl-o
+# - hit Enter to checkout the selected branch.
+# - text filtering against branch names, too.
 #
-
 
 branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
+# The primary branch
 mainormaster() {
   (git branch --format '%(refname:short)' --sort=-committerdate --list master main; echo main) | head -n1 || echo main
 }
 
-stat_cmd="git diff --color=always --stat origin/$(mainormaster)...{}"
 diffcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges origin/$(mainormaster)..{1}"
 diffbranch_cmd="git diff origin/$(mainormaster)...{} | delta"
 
@@ -28,9 +25,7 @@ diffbranch_cmd="git diff origin/$(mainormaster)...{} | delta"
 # Hardcore inspiration:
 # - https://github.com/junegunn/fzf-git.sh
 
-
 _browse_branches() {
-  local preview_cmd="$diffcommits_cmd"  # Default preview: commit log
 
   git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
     |  fzf-tmux  --ansi  -p80%,60%  -- \
@@ -38,7 +33,7 @@ _browse_branches() {
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
         --preview-window='right,70%,border-left,border-rounded' --preview="$diffcommits_cmd" --preview-label="Commits unique to branch" \
-        --header $'CTRL-O (show branch diff)\nENTER (checkout)\n' \
+        --header $'ENTER (checkout)\nCTRL-O (show branch diff)\n' \
         --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
         --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
         --bind "ctrl-o:preview:$diffbranch_cmd" 
