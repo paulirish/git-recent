@@ -17,8 +17,15 @@ mainormaster() {
   (git branch --format '%(refname:short)' --sort=-committerdate --list master main; echo main) | head -n1 || echo main
 }
 
-diffcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges origin/$(mainormaster)..{1}"
-diffbranch_cmd="git diff origin/$(mainormaster)...{} | delta"
+uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges origin/$(mainormaster)..{1}"
+
+diffbranch_cmd="git diff --color=always origin/$(mainormaster)...{}"
+# Progressive enhancement if you have delta or diff-so-fancy
+if command -v delta >/dev/null 2>&1; then
+  diffbranch_cmd="$diffbranch_cmd | delta"
+elif command -v diff-so-fancy >/dev/null 2>&1; then
+  diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
+fi
 
 # fzf basic inspiration:
 # - https://github.com/junegunn/fzf/wiki/Examples#git, https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
@@ -26,19 +33,17 @@ diffbranch_cmd="git diff origin/$(mainormaster)...{} | delta"
 # - https://github.com/junegunn/fzf-git.sh
 
 _browse_branches() {
-
   git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
     |  fzf-tmux  --ansi  -p80%,60%  -- \
         --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
-        --preview-window='right,70%,border-left,border-rounded' --preview="$diffcommits_cmd" --preview-label="Commits unique to branch" \
+        --preview-window='right,70%,border-left,border-rounded' --preview="$uniqcommits_cmd" --preview-label="Commits unique to branch" \
         --header $'ENTER (checkout)\nCTRL-O (show branch diff)\n' \
         --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
         --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
         --bind "ctrl-o:preview:$diffbranch_cmd" 
 } 
-
 
 chosen_branch="$(_browse_branches)"
 if [[ -n "$chosen_branch" ]]; then
