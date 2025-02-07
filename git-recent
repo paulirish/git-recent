@@ -1,62 +1,52 @@
 #!/bin/bash
 
-##
-## git-recent
-##
-## list all local branches, sorted by last commit, formatted reall purdy
-##
+#
+# git recent 2.0 - switching branches, but so fancy
+#
+# - view recently edited local branches
+# - see unique commits to that branch, and optionally the branch diff (against the main/master/primary branch) with Ctrl-o
+# - hit Enter to checkout the selected branch.
+# - text filtering against branch names, too.
+#
 
-# Windows needs more basic format (#8, git-for-windows/git#865)
-case $(uname -s) in
-  CYGWIN*|MINGW*|MSYS*)
-    branch='%(refname:short)'
-    ;;
-  *)
-    branch='%(color:yellow)%(refname:short)%(color:reset)'
-    ;;
-esac
+branches_format="%(color:yellow)%(refname:short)%(color:reset)"
+commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
-COUNT=0
-while getopts "n:" opt; do
-  case ${opt} in
-    n )
-      if ! [[ $OPTARG =~ ^[0-9]{1,}$ ]]; then
-        echo "-n should be an integer."
-        exit 1
-      fi
-      COUNT=${OPTARG}
-      shift
-      ;;
-  esac
-done
-shift $((OPTIND-1))
+# The primary branch
+mainormaster() {
+  (git branch --format '%(refname:short)' --sort=-committerdate --list master main; echo main) | head -n1 || echo main
+}
 
-format="\
-%(HEAD) \
-$branch|\
-%(color:bold red)%(objectname:short)%(color:reset) \
-%(color:bold green)(%(committerdate:relative))%(color:reset) \
-%(color:bold blue)%(authorname)%(color:reset) \
-%(color:yellow)%(upstream:track)%(color:reset) \
-%(contents:subject)"
+uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges origin/$(mainormaster)..{1}"
 
-lessopts="--tabs=4 --quit-if-one-screen --RAW-CONTROL-CHARS --no-init"
+diffbranch_cmd="git diff --color=always origin/$(mainormaster)...{}"
+# Progressive enhancement if you have delta or diff-so-fancy
+if command -v delta >/dev/null 2>&1; then
+  diffbranch_cmd="$diffbranch_cmd | delta"
+elif command -v diff-so-fancy >/dev/null 2>&1; then
+  diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
+fi
 
-git for-each-ref \
-    --color=always \
-    --count=$COUNT \
-    --sort=-committerdate \
-    "refs/heads/"  \
-    --format="$format" \
-  | column -ts '|'  \
-  | less "$lessopts"
+# fzf basic inspiration:
+# - https://github.com/junegunn/fzf/wiki/Examples#git, https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
+# Hardcore inspiration:
+# - https://github.com/junegunn/fzf-git.sh
 
-# The above command:
-#   for all known branches,
-#   (force coloring on this, especially since it's being piped)
-#   optionally, specify the number of branches you want to display
-#   sort descending by last commit
-#   show local branches (change to "" to include both local + remote branches)
-#   apply the formatting template above
-#   break into columns
-#   use the pager only if there's not enough space
+_browse_branches() {
+  git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
+    |  fzf-tmux  --ansi  -p80%,60%  -- \
+        --layout=reverse --multi --height=90% --min-height=20  \
+        --border-label-pos=2 --border-label '🌲 Branches' --border \
+        --no-hscroll --no-multi \
+        --preview-window='right,70%,border-left,border-rounded' --preview="$uniqcommits_cmd" --preview-label="Commits unique to branch" \
+        --header $'ENTER (checkout)\nCTRL-O (show branch diff)\n' \
+        --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
+        --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
+        --bind "ctrl-o:preview:$diffbranch_cmd" 
+} 
+
+chosen_branch="$(_browse_branches)"
+if [[ -n "$chosen_branch" ]]; then
+  echo git checkout "$chosen_branch"
+  git checkout "$chosen_branch"
+fi
