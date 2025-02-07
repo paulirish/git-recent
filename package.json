@@ -1,9 +1,10 @@
 {
   "name": "git-recent",
-  "version": "1.1.1",
-  "description": "List recent git branches, formatted so fancy",
+  "version": "2.0",
+  "description": "List recent git branches, select one for checkout. See branch commits and diffs, all formatted so fancy",
   "bin": {
-    "git-recent": "git-recent"
+    "git-recent": "git-recent",
+    "git-recent-og": "git-recent-og"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

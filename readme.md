@@ -53,8 +53,8 @@ If you're a Windows user, you need to use [Git Bash](https://git-scm.com/downloa
 
 ### Installation
 
-You can add the `git-recent` location to your path (e.g. add the directory to your `PATH` environment
-or copy `git-recent` into an existing included path like `/usr/local/bin` or `~/bin/`).
+You can download/clone and add the `git-recent` directory to your path (e.g. add the directory to your `PATH` environment
+or copy `git-recent-og` script into an existing included path like `/usr/local/bin` or `~/bin/`).
 
 You can use also `npm` to install the global binary:
 
