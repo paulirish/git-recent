@@ -1,6 +1,6 @@
 {
   "name": "git-recent",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "List recent git branches, select one for checkout. See branch commits and diffs, all formatted so fancy",
   "bin": {
     "git-recent": "git-recent",
