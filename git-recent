@@ -34,7 +34,7 @@ fi
 
 _browse_branches() {
   git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
-    |  fzf-tmux  --ansi  -p80%,60%  -- \
+    |  fzf --ansi -- \
         --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
