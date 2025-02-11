@@ -1,0 +1,41 @@
+.TH GIT-RECENT 1 "February 8, 2025" "git-recent 2.0"
+.SH NAME
+git recent \- Browse and checkout recently used Git branches.
+.SH SYNOPSIS
+.B git recent
+.SH DESCRIPTION
+.B git recent
+provides an interactive interface (using
+.I fzf
+) to browse your latest local git branches. It displays a list of branches sorted by recency, shows the unique commits for each branch, and allows you to checkout a branch with
+.B Enter\fR.
+You can also view the diff of a branch against the main/master branch.
+.SH OPTIONS
+.TP
+.B --help
+Display a help message.
+.SH KEYBINDINGS
+.TP
+.B Enter
+Checkout the selected branch.
+.TP
+.B Up/Down arrow keys
+Navigate the branch list.
+.TP
+.B Type 
+Filter branch list with fuzzy text matching
+.TP
+.B Ctrl-o
+Show the diff of the selected branch against the main/master branch.
+.TP
+.B Ctrl-C
+Exit.
+.SH INSTALLATION
+.I fzf
+is required. https://junegunn.github.io/fzf/installation/
+
+.SH SEE ALSO
+.I fzf(1), git(1), git-open(1), diff-so-fancy(1), delta(1)
+.br
+.I git-recent-og
+(for the non-fzf version)

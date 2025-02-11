@@ -9,17 +9,31 @@
 # - text filtering against branch names, too.
 #
 
+if ! command -v fzf >/dev/null 2>&1; then
+  echo "Error: fzf is not installed. Please install fzf to use git-recent." >&2
+  exit 1
+fi
+if [[ "$1" == "--help" ]]; then
+  echo "git-recent: Browse and checkout recently used Git branches."
+  echo
+  echo "Keybindings:"
+  echo "  Enter:      Checkout the selected branch"
+  echo "  Ctrl-O:     Show the diff of the selected branch against the main/master branch"
+  echo "  Ctrl-C:     Exit"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------------------
+
 branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
-# The primary branch
-mainormaster() {
-  (git branch --format '%(refname:short)' --sort=-committerdate --list master main; echo main) | head -n1 || echo main
-}
+# The primary branch (eg main or master or w/e)
+origin_HEAD=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
-uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges origin/$(mainormaster)..{1}"
+uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $origin_HEAD..{1}"
 
-diffbranch_cmd="git diff --color=always origin/$(mainormaster)...{}"
+diffbranch_cmd="git diff --color=always $origin_HEAD...{}"
 # Progressive enhancement if you have delta or diff-so-fancy
 if command -v delta >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | delta"
@@ -27,10 +41,10 @@ elif command -v diff-so-fancy >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
 fi
 
-# fzf basic inspiration:
-# - https://github.com/junegunn/fzf/wiki/Examples#git, https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
-# Hardcore inspiration:
-# - https://github.com/junegunn/fzf-git.sh
+# fzf git inspiration:
+# - https://github.com/junegunn/fzf/wiki/Examples#git 
+# - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
+# - https://github.com/junegunn/fzf-git.sh (intense.)
 
 _browse_branches() {
   git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
