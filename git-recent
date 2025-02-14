@@ -41,13 +41,16 @@ elif command -v diff-so-fancy >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
 fi
 
+# if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
+[[ -n "$1" ]] && heads="refs/remotes/$1" || heads="refs/heads"
+
 # fzf git inspiration:
 # - https://github.com/junegunn/fzf/wiki/Examples#git 
 # - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
 # - https://github.com/junegunn/fzf-git.sh (intense.)
 
 _browse_branches() {
-  git for-each-ref --color=always --sort=-authordate "refs/heads/" --format="$branches_format" \
+  git for-each-ref --color=always --sort=-authordate "$heads" --format="$branches_format" \
     |  fzf --ansi -- \
         --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
