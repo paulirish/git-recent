@@ -41,6 +41,19 @@ elif command -v diff-so-fancy >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
 fi
 
+# Copy to clipboard, variants for mac/linux
+copy_cmd="echo 'Could not copy {} to clipboard.'"
+if command -v pbcopy >/dev/null; then
+  copy_cmd="printf '%s' {} | pbcopy"
+elif command -v wl-copy >/dev/null; then
+  copy_cmd="printf '%s' {} | wl-copy"
+elif command -v xclip >/dev/null; then
+  copy_cmd="printf '%s' {} | xclip -selection clipboard"
+elif command -v xsel >/dev/null; then
+  copy_cmd="printf '%s' {} | xsel --clipboard"
+fi
+
+
 # fzf git inspiration:
 # - https://github.com/junegunn/fzf/wiki/Examples#git 
 # - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
@@ -53,9 +66,10 @@ _browse_branches() {
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
         --preview-window='right,70%,border-left,border-rounded' --preview="$uniqcommits_cmd" --preview-label="Commits unique to branch" \
-        --header $'ENTER (checkout)\nCTRL-O (show branch diff)\n' \
+        --header $'ENTER (checkout)\nCTRL-O (show branch diff)\nCTRL-Y (copy name to clipboard)' \
         --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
         --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
+        --bind "ctrl-y:execute-silent($copy_cmd)" \
         --bind "ctrl-o:preview:$diffbranch_cmd" 
 } 
 
