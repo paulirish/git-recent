@@ -28,12 +28,13 @@ fi
 branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
-# The primary branch (eg main or master or w/e)
-origin_HEAD=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
+# The HEAD of the primary branch (eg main or master or w/e), for diffing.
+# TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
+diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
-uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $origin_HEAD..{1}"
+uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..{1}"
 
-diffbranch_cmd="git diff --color=always $origin_HEAD...{}"
+diffbranch_cmd="git diff --color=always $diff_base...{}"
 # Progressive enhancement if you have delta or diff-so-fancy
 if command -v delta >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | delta"
