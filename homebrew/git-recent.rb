@@ -10,7 +10,7 @@ class GitRecent < Formula
     sha256 cellar: :any_skip_relocation, all: "3a4143920243a863447daa6f2b17b3cda4e0a163e8502c6c36a910eee4ee7450"
   end
 
-  # depends_on "fzf"
+  depends_on "fzf"
 
   depends_on macos: :sierra
 
