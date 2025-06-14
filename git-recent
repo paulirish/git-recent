@@ -62,10 +62,13 @@ fi
 # - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
 # - https://github.com/junegunn/fzf-git.sh (intense.)
 
+# If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing.)
+filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
+
 _browse_branches() {
   git for-each-ref --color=always --sort=-authordate "$heads" --format="$branches_format" \
-    |  fzf --ansi -- \
-        --layout=reverse --multi --height=90% --min-height=20  \
+    |  fzf  \
+        $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
         --preview-window='right,70%,border-left,border-rounded' --preview="$uniqcommits_cmd" --preview-label="Commits unique to branch" \
@@ -75,9 +78,12 @@ _browse_branches() {
         --bind "ctrl-y:execute-silent($copy_cmd)" \
         --bind "ctrl-o:preview:$diffbranch_cmd" 
 } 
-
 chosen_branch="$(_browse_branches)"
-if [[ -n "$chosen_branch" ]]; then
+line_count=$(printf "%s" "$chosen_branch" | wc -l)
+
+if [[ -n "$chosen_branch" ]] && (( line_count == 0 )); then
   echo git checkout "$chosen_branch"
   git checkout "$chosen_branch"
+else
+  echo "$chosen_branch"
 fi
