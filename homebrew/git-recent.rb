@@ -21,7 +21,6 @@ class GitRecent < Formula
   conflicts_with "git-plus", because: "both install `git-recent` binaries"
 
   def install
-    man1.install "man/man1/git-recent.1"
     bin.install "git-recent"
     bin.install "git-recent-og"
   end
@@ -31,13 +30,24 @@ class GitRecent < Formula
     # User will be 'BrewTestBot' on CI, needs to be set here to work locally
     system "git", "config", "user.name", "BrewTestBot"
     system "git", "config", "user.email", "brew@test.bot"
-    system "git", "commit", "--allow-empty", "-m", "test_commit"
-    # assert_match(/.*main.*seconds? ago.*BrewTestBot.*\n.*test_commit/, shell_output("git recent"))
-    # output = shell_output("git log")
-    output = pipe_output("#{bin}/git-recent")
-    puts output
-    assert_equal "main", output.strip
-    # assert_equal "test_commit", output.strip
-    assert_equal "Branches", output.strip
+    system "git", "commit", "--allow-empty", "-m", "initial commit"
+
+    # Create a branch that we will later select.
+    system "git", "checkout", "-b", "feature-x-branch"
+    system "git", "commit", "--allow-empty", "-m", "commit on feature branch"
+
+    # Create another branch to ensure fzf has multiple choices.
+    system "git", "checkout", "-b", "another-branch"
+    system "git", "commit", "--allow-empty", "-m", "commit on another branch"
+    system "git", "checkout", "main"
+
+    # This should select "feature-x-branch" and the script will check it out.
+    output = with_env "GIT_RECENT_QUERY" => "x" do
+      shell_output("#{bin}/git-recent")
+    end
+
+    # The important result is that the current branch has been changed.
+    # We verify this by asking git for the current branch name.
+    assert_equal "feature-x-branch", shell_output("git rev-parse --abbrev-ref HEAD").strip
   end
 end
