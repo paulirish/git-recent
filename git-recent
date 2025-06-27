@@ -27,7 +27,6 @@ fi
 
 # ---------------------------------------------------------------------------------------
 
-branches_format="%(color:yellow)%(refname:short)%(color:reset)"
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
@@ -36,7 +35,7 @@ diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk 
 
 uniqcommits_cmd="branch_name=\$(echo {1} | cut -d' ' -f1) git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\$branch_name"
 
-diffbranch_cmd="git diff --color=always $diff_base...{}"
+diffbranch_cmd="branch_name=\$(echo {1} | cut -d' ' -f1) git diff --color=always $diff_base...\$branch_name"
 # Progressive enhancement if you have delta or diff-so-fancy
 if command -v delta >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | delta"
@@ -60,8 +59,12 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
+# if show_cl passed then also run git cl status. (chromium repos)
+[[ "$1" == "--cl" || "$1" == "-cl" ]] && show_cl=true || show_cl=false
+
 # if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
-[[ -n "$1" ]] && heads="refs/remotes/$1" || heads="refs/heads"
+[[ -n "$1" && "$show_cl" != true ]] && heads="refs/remotes/$1" || heads="refs/heads"
+
 
 # fzf git inspiration:
 # - https://github.com/junegunn/fzf/wiki/Examples#git 
@@ -71,37 +74,18 @@ NC='\033[0m' # No Color
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing.)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
+CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
 
-CL_STATUS=$(git cl status --fast --no-branch-color | grep 'https://' |  sed 's| (.*||')
-# CL_STATUS=$(cat <<'EOF'
-#                  delete-unused-things-june25 : https://crrev.com/c/6649316 (waiting)
-#                          download-branded-chrome : https://crrev.com/c/6333632 (waiting)
-#                          drop-micro-sec-entirely : https://crrev.com/c/6287827 (waiting)
-#                   editor-search-result-to-center : https://crrev.com/c/5958176 (waiting)
-#                                faster-ut-handler : https://crrev.com/c/6472820 (waiting)
-#                           initiator-arrow-reduxx : https://crrev.com/c/5309492 (waiting)
-#                                   insight-bounds : https://crrev.com/c/6436290 (waiting)
-#                              io-throttling-order : https://crrev.com/c/6535192 (waiting)
-#                              knapsack-for-victor : https://crrev.com/c/5981368 (waiting)
-#                          lcp-phase-mini-refactor : https://crrev.com/c/6651250 (waiting)
-#                                module-graph-test : https://crrev.com/c/6183179 (waiting)
-#                               negative-lcp-phase : https://crrev.com/c/6651013 (waiting)
-#                          react-ext-link-handling : https://crrev.com/c/6535878 (waiting)
-#             sidebar-reset-active-insight-on-hide : https://crrev.com/c/6433141 (waiting)
-#                                      url-eliding : https://crrev.com/c/6329935 (waiting)
-#                                   usertiming-fix : https://crrev.com/c/6533610 (waiting)
-#                                      verbosespec : https://crrev.com/c/6635126 (waiting)
-# EOF
-# )
-                  
-
-# echo "$CL_STATUS" 
 
 _browse_branches() {
-  git for-each-ref --sort=-authordate "$heads" --format="$branches_format" \
+  git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
+        if [ "$show_cl" != true ]; then
+          printf "$YELLOW$branch_name$NC\n"
+          continue
+        fi
         review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
-        printf "$YELLOW$branch_name $DIM$review_url\n"
+        printf "$YELLOW$branch_name $DIM$review_url$NC\n"
       done \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
