@@ -85,7 +85,9 @@ _browse_branches() {
           continue
         fi
         review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
-        printf "$YELLOW%s $DIM%s$NC\n" "$branch_name" "$review_url"
+        # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
+        # TODO: maybe get rid of the crrev.com/c/ text as the link?
+        printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
       done \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
@@ -98,12 +100,13 @@ _browse_branches() {
         --bind "ctrl-y:execute-silent($copy_cmd)" \
         --bind "ctrl-o:preview:$diffbranch_cmd" 
 } 
-chosen_branch="$(_browse_branches)"
-line_count=$(printf "%s" "$chosen_branch" | wc -l)
+output="$(_browse_branches)"
+line_count=$(printf "%s" "$output" | wc -l)
 
-if [[ -n "$chosen_branch" ]] && (( line_count == 0 )); then
+if [[ -n "$output" ]] && (( line_count == 0 )); then
+  chosen_branch=$(echo "$output" | cut -d' ' -f1)
   echo git checkout "$chosen_branch"
   git checkout "$chosen_branch"
 else
-  echo "$chosen_branch"
+  echo "$output"
 fi
