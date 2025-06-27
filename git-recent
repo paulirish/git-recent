@@ -34,7 +34,7 @@ commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
 diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
-uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..{1}"
+uniqcommits_cmd="branch_name=\$(echo {1} | cut -d' ' -f1) git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\$branch_name"
 
 diffbranch_cmd="git diff --color=always $diff_base...{}"
 # Progressive enhancement if you have delta or diff-so-fancy
@@ -56,6 +56,10 @@ elif command -v xsel >/dev/null; then
   copy_cmd="printf '%s' {} | xsel --clipboard"
 fi
 
+YELLOW='\033[0;33m'
+DIM='\033[2m'
+NC='\033[0m' # No Color
+
 # if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
 [[ -n "$1" ]] && heads="refs/remotes/$1" || heads="refs/heads"
 
@@ -67,9 +71,39 @@ fi
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing.)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
+
+CL_STATUS=$(git cl status --fast --no-branch-color | grep 'https://' |  sed 's| (.*||')
+# CL_STATUS=$(cat <<'EOF'
+#                  delete-unused-things-june25 : https://crrev.com/c/6649316 (waiting)
+#                          download-branded-chrome : https://crrev.com/c/6333632 (waiting)
+#                          drop-micro-sec-entirely : https://crrev.com/c/6287827 (waiting)
+#                   editor-search-result-to-center : https://crrev.com/c/5958176 (waiting)
+#                                faster-ut-handler : https://crrev.com/c/6472820 (waiting)
+#                           initiator-arrow-reduxx : https://crrev.com/c/5309492 (waiting)
+#                                   insight-bounds : https://crrev.com/c/6436290 (waiting)
+#                              io-throttling-order : https://crrev.com/c/6535192 (waiting)
+#                              knapsack-for-victor : https://crrev.com/c/5981368 (waiting)
+#                          lcp-phase-mini-refactor : https://crrev.com/c/6651250 (waiting)
+#                                module-graph-test : https://crrev.com/c/6183179 (waiting)
+#                               negative-lcp-phase : https://crrev.com/c/6651013 (waiting)
+#                          react-ext-link-handling : https://crrev.com/c/6535878 (waiting)
+#             sidebar-reset-active-insight-on-hide : https://crrev.com/c/6433141 (waiting)
+#                                      url-eliding : https://crrev.com/c/6329935 (waiting)
+#                                   usertiming-fix : https://crrev.com/c/6533610 (waiting)
+#                                      verbosespec : https://crrev.com/c/6635126 (waiting)
+# EOF
+# )
+                  
+
+# echo "$CL_STATUS" 
+
 _browse_branches() {
-  git for-each-ref --color=always --sort=-authordate "$heads" --format="$branches_format" \
-    |  fzf  \
+  git for-each-ref --sort=-authordate "$heads" --format="$branches_format" \
+    | while read -r branch_name; do
+        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
+        printf "$YELLOW$branch_name $DIM$review_url\n"
+      done \
+    | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
         --no-hscroll --no-multi \
