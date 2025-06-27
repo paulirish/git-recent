@@ -74,18 +74,18 @@ NC='\033[0m' # No Color
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing.)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
+# Chromium hackers may want reference to their relevant CL.
 CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
-
 
 _browse_branches() {
   git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
         if [ "$show_cl" != true ]; then
-          printf "$YELLOW$branch_name$NC\n"
+          printf "$YELLOW%s$NC\n" "$branch_name"
           continue
         fi
         review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
-        printf "$YELLOW$branch_name $DIM$review_url$NC\n"
+        printf "$YELLOW%s $DIM%s$NC\n" "$branch_name" "$review_url"
       done \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
