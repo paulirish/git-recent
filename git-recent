@@ -33,9 +33,10 @@ commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
 diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
-uniqcommits_cmd="branch_name=\$(echo {1} | cut -d' ' -f1) git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\$branch_name"
+# the cut drops anything after the branch name, like the Chromium link. These commands need to work in all shells (bash, fish, etc)
+uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\$(echo {1} | cut -d' ' -f1)"
+diffbranch_cmd="git diff --color=always $diff_base...\$(echo {1} | cut -d' ' -f1)"
 
-diffbranch_cmd="branch_name=\$(echo {1} | cut -d' ' -f1) git diff --color=always $diff_base...\$branch_name"
 # Progressive enhancement if you have delta or diff-so-fancy
 if command -v delta >/dev/null 2>&1; then
   diffbranch_cmd="$diffbranch_cmd | delta"
