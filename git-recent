@@ -87,6 +87,7 @@ _browse_branches() {
         review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
         # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
         # TODO: maybe get rid of the crrev.com/c/ text as the link?
+        # TODO: use `git config branch.$(git rev-parse --abbrev-ref HEAD).gerritissue` and gerritserver to avoid using `git cl status`
         printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
       done \
     | fzf  \
