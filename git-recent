@@ -27,25 +27,21 @@ fi
 
 # ---------------------------------------------------------------------------------------
 
-# Colorized hash, author, date, then commit subject followed by commit message body (wrapped and indented).
-commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s%w(0,4,4)%+b%w(0,0,0)"
-
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
 diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
 # Extract branch name (without any trailing text, like the Chromium link)
 define_branchname="branchname=\\\$(echo {1} | cut -d' ' -f1)"
+
+# Colorized hash, author, date, then commit subject followed by commit message body (wrapped and indented).
+commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s%w(0,4,4)%+b%w(0,0,0)"
 uniqcommits_cmd="sh -c \"$define_branchname; git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\\\$branchname\""
 
 # Progressive enhancement if you have delta or diff-so-fancy
-if command -v deltaz >/dev/null 2>&1; then
-  diffbranch_cmd="sh -c \"$define_branchname; git diff --color=always $diff_base...\\\$branchname | delta\""
-elif command -v diff-so-fancy >/dev/null 2>&1; then
-  diffbranch_cmd="sh -c \"$define_branchname; git diff --color=always $diff_base...\\\$branchname | diff-so-fancy\""
-else
-  diffbranch_cmd="sh -c \"$define_branchname; git diff --color=always $diff_base...\\\$branchname\""
-fi
+diff_pager_cmd=$(command -v delta || command -v diff-so-fancy)
+pipe_to_pager=${diff_pager_cmd:+" | $diff_pager_cmd"}
+diffbranch_cmd="sh -c \"$define_branchname; git diff --color=always $diff_base...\\\$branchname $pipe_to_pager\""
 
 # Copy to clipboard, variants for mac/linux
 copy_cmd="echo 'Could not copy {} to clipboard.'"
