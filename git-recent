@@ -27,8 +27,9 @@ fi
 
 # ---------------------------------------------------------------------------------------
 
-commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
-
+# Colorized hash, author, date, then commit subject followed by commit message body (wrapped and indented).
+commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s%w(0,4,4)%+b%w(0,0,0)"
+# commits_format='%h (%>(16)%ad %an) %s%w(0,4,4)%+b%w(0,0,0)'
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
 diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
@@ -68,7 +69,7 @@ NC='\033[0m' # No Color
 
 
 # fzf git inspiration:
-# - https://github.com/junegunn/fzf/wiki/Examples#git 
+# - https://github.com/junegunn/fzf/wiki/Examples#git
 # - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
 # - https://github.com/junegunn/fzf-git.sh (intense.)
 
@@ -85,7 +86,7 @@ _browse_branches() {
           printf "$YELLOW%s$NC\n" "$branch_name"
           continue
         fi
-        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
+        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
         # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
         # TODO: maybe get rid of the crrev.com/c/ text as the link?
         printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
@@ -99,8 +100,8 @@ _browse_branches() {
         --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
         --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
         --bind "ctrl-y:execute-silent($copy_cmd)" \
-        --bind "ctrl-o:preview:$diffbranch_cmd" 
-} 
+        --bind "ctrl-o:preview:$diffbranch_cmd"
+}
 output="$(_browse_branches)"
 line_count=$(printf "%s" "$output" | wc -l)
 
