@@ -27,22 +27,21 @@ fi
 
 # ---------------------------------------------------------------------------------------
 
-commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s"
-
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
 diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
 
-# the cut drops anything after the branch name, like the Chromium link. These commands need to work in all shells (bash, fish, etc)
-uniqcommits_cmd="git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\$(echo {1} | cut -d' ' -f1)"
-diffbranch_cmd="git diff --color=always $diff_base...\$(echo {1} | cut -d' ' -f1)"
+# Extract branch name (without any trailing text, like the Chromium link)
+define_branchname="branchname=\\\$(echo {1} | cut -d' ' -f1)"
+
+# Colorized hash, author, date, then commit subject followed by commit message body (wrapped and indented).
+commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s%w(0,4,4)%+b%w(0,0,0)"
+uniqcommits_cmd="sh -c \"$define_branchname; git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\\\$branchname\""
 
 # Progressive enhancement if you have delta or diff-so-fancy
-if command -v delta >/dev/null 2>&1; then
-  diffbranch_cmd="$diffbranch_cmd | delta"
-elif command -v diff-so-fancy >/dev/null 2>&1; then
-  diffbranch_cmd="$diffbranch_cmd | diff-so-fancy"
-fi
+diff_pager_cmd=$(command -v delta || command -v diff-so-fancy)
+pipe_to_pager=${diff_pager_cmd:+" | $diff_pager_cmd"}
+diffbranch_cmd="sh -c \"$define_branchname; git diff --color=always $diff_base...\\\$branchname $pipe_to_pager\""
 
 # Copy to clipboard, variants for mac/linux
 copy_cmd="echo 'Could not copy {} to clipboard.'"
@@ -68,11 +67,11 @@ NC='\033[0m' # No Color
 
 
 # fzf git inspiration:
-# - https://github.com/junegunn/fzf/wiki/Examples#git 
+# - https://github.com/junegunn/fzf/wiki/Examples#git
 # - https://github.com/junegunn/fzf/wiki/Examples-(fish)#git
 # - https://github.com/junegunn/fzf-git.sh (intense.)
 
-# If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing.)
+# If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/g/git-recent.rb#L41-L46)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
 # Chromium hackers may want reference to their relevant CL.
@@ -85,7 +84,7 @@ _browse_branches() {
           printf "$YELLOW%s$NC\n" "$branch_name"
           continue
         fi
-        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name}\b" | grep -o -E 'https://.*' | sed 's|https://||')
+        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
         # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
         # TODO: maybe get rid of the crrev.com/c/ text as the link?
         # TODO: use `git config branch.$(git rev-parse --abbrev-ref HEAD).gerritissue` and gerritserver to avoid using `git cl status`
@@ -100,8 +99,8 @@ _browse_branches() {
         --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
         --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
         --bind "ctrl-y:execute-silent($copy_cmd)" \
-        --bind "ctrl-o:preview:$diffbranch_cmd" 
-} 
+        --bind "ctrl-o:preview:$diffbranch_cmd"
+}
 output="$(_browse_branches)"
 line_count=$(printf "%s" "$output" | wc -l)
 
