@@ -28,14 +28,31 @@ fi
 # ---------------------------------------------------------------------------------------
 
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
-# TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
-diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
+# Correctly resolve the default branch using git plumbing.
+diff_base=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null)
+if [[ -z "$diff_base" || "$diff_base" == "origin/HEAD" ]]; then
+  # Fallback: Try to guess main or master, or just error gracefully later if needed.
+  if git rev-parse --verify origin/main >/dev/null 2>&1; then
+    diff_base="origin/main"
+  elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+    diff_base="origin/master"
+  else
+    # Last resort: just use HEAD, though diffing HEAD..branch is weird if you are on the branch.
+    # But usually this is for diffing against upstream.
+    diff_base="HEAD"
+  fi
+fi
 
 # Extract branch name (without any trailing text, like the Chromium link)
-define_branchname="branchname=\\\$(echo {1} | cut -d' ' -f1)"
+# Use more robust extraction: take the first field, strip whitespace.
+define_branchname="branchname=\\\$(echo '{1}' | awk '{print \$1}')"
 
 # Colorized hash, author, date, then commit subject followed by commit message body (wrapped and indented).
 commits_format="%C(red bold)%h %C(bold blue)%an %C(bold green)%ad %Creset%s%w(0,4,4)%+b%w(0,0,0)"
+
+# Use 'sh -c' carefully. We pass branchname as an environment variable or argument to avoid injection if possible.
+# But fzf preview commands are shell strings. We must rely on the extraction logic.
+# The 'awk' above ensures branchname has no spaces.
 uniqcommits_cmd="sh -c \"$define_branchname; git log --date=human --color=always --format='$commits_format' --no-merges $diff_base..\\\$branchname\""
 
 # Progressive enhancement if you have delta or diff-so-fancy
@@ -59,11 +76,35 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
-# if show_cl passed then also run git cl status. (chromium repos)
-[[ "$1" == "--cl" || "$1" == "-cl" ]] && show_cl=true || show_cl=false
+# Backward compatibility for --cl flag
+if [[ "$1" == "--cl" || "$1" == "-cl" ]]; then
+  export GIT_RECENT_SOURCE="git-recent-cl"
+  shift
+fi
 
-# if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
-[[ -n "$1" && "$show_cl" != true ]] && heads="refs/remotes/$1" || heads="refs/heads"
+# Determine source of branches
+# If GIT_RECENT_SOURCE is set, use it.
+# Otherwise default to local branches.
+if [[ -n "$GIT_RECENT_SOURCE" ]]; then
+  if command -v "$GIT_RECENT_SOURCE" >/dev/null 2>&1; then
+    # If the user passed arguments (e.g. a remote name), pass them to the source provider
+    source_cmd="$GIT_RECENT_SOURCE $@"
+  else
+    echo "Error: GIT_RECENT_SOURCE '$GIT_RECENT_SOURCE' not found." >&2
+    exit 1
+  fi
+else
+  # Default behavior
+  # if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
+  if [[ -n "$1" ]]; then
+    heads="refs/remotes/$1"
+  else
+    heads="refs/heads"
+  fi
+
+  # Standard listing
+  source_cmd="git for-each-ref --sort=-authordate \"$heads\" --format=\"$YELLOW%(refname:short)$NC\""
+fi
 
 
 # fzf git inspiration:
@@ -74,22 +115,8 @@ NC='\033[0m' # No Color
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/g/git-recent.rb#L41-L46)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
-# Chromium hackers may want reference to their relevant CL.
-CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
-
 _browse_branches() {
-  git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
-    | while read -r branch_name; do
-        if [ "$show_cl" != true ]; then
-          printf "$YELLOW%s$NC\n" "$branch_name"
-          continue
-        fi
-        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
-        # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
-        # TODO: maybe get rid of the crrev.com/c/ text as the link?
-        # TODO: use `git config branch.$(git rev-parse --abbrev-ref HEAD).gerritissue` and gerritserver to avoid using `git cl status`
-        printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
-      done \
+  eval "$source_cmd" \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
         --border-label-pos=2 --border-label '🌲 Branches' --border \
@@ -105,7 +132,7 @@ output="$(_browse_branches)"
 line_count=$(printf "%s" "$output" | wc -l)
 
 if [[ -n "$output" ]] && (( line_count == 0 )); then
-  chosen_branch=$(echo "$output" | cut -d' ' -f1)
+  chosen_branch=$(echo "$output" | awk '{print $1}')
   echo git checkout "$chosen_branch"
   git checkout "$chosen_branch"
 else

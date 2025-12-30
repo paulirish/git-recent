@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# git-recent-cl
+# Plugin for git-recent to add Chromium CL status.
+#
+
+YELLOW='\033[0;33m'
+DIM='\033[2m'
+NC='\033[0m' # No Color
+
+# Determine which refs to look at. Default to heads.
+# If an argument is provided (e.g. from `git recent remotename`), use that.
+heads="refs/heads"
+if [[ -n "$1" ]]; then
+  heads="refs/remotes/$1"
+fi
+
+# Get CL status
+# This mimics the logic in the original git-recent
+CL_STATUS=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
+
+git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
+  | while read -r branch_name; do
+      review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
+
+      if [[ -n "$review_url" ]]; then
+          # Using fancy integrated hyperlinks
+          printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
+      else
+          printf "$YELLOW%s$NC\n" "$branch_name"
+      fi
+    done
