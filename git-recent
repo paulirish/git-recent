@@ -74,6 +74,13 @@ NC='\033[0m' # No Color
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/g/git-recent.rb#L41-L46)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
+# Check fzf version for preview scroll keys support (introduced in 0.23.0)
+fzf_version=$(fzf --version | awk '{print $1}')
+fzf_scroll_binds=""
+if [[ $(printf '%s\n0.23.0\n' "$fzf_version" | sort -V | head -n1) == "0.23.0" ]]; then
+  fzf_scroll_binds="--bind 'preview-scroll-up:preview-up+preview-up+preview-up' --bind 'preview-scroll-down:preview-down+preview-down+preview-down'"
+fi
+
 # Chromium hackers may want reference to their relevant CL.
 CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
 
@@ -96,8 +103,7 @@ _browse_branches() {
         --no-hscroll --no-multi \
         --preview-window='right,70%,border-left,border-rounded' --preview="$uniqcommits_cmd" --preview-label="Commits unique to branch" \
         --header $'ENTER (checkout)\nCTRL-O (show branch diff)\nCTRL-Y (copy name to clipboard)' \
-        --bind 'preview-scroll-up:preview-up+preview-up+preview-up' \
-        --bind 'preview-scroll-down:preview-down+preview-down+preview-down' \
+        $fzf_scroll_binds \
         --bind "ctrl-y:execute-silent($copy_cmd)" \
         --bind "ctrl-o:preview:$diffbranch_cmd"
 }
