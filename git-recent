@@ -128,14 +128,10 @@ if [[ -n "$output" ]] && (( line_count == 0 )); then
   wt_path=$(_get_worktree_for_branch "$chosen_branch")
 
   if [[ -n "$wt_path" ]]; then
-    echo "Branch '$chosen_branch' is open in worktree: $wt_path"
-    if [[ "$GIT_RECENT_AUTO_CD" == "1" ]]; then
-      echo "__CD__:$wt_path"
-    else
-      echo "To jump there, run: cd \"$wt_path\""
-    fi
+    echo "Branch '$chosen_branch' is open in worktree: $wt_path" >&2
+    echo "$wt_path"
   else
-    echo git checkout "$chosen_branch"
+    echo "git checkout $chosen_branch" >&2
     git checkout "$chosen_branch"
   fi
 else
