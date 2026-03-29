@@ -29,7 +29,7 @@ fi
 
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
-diff_base=$(cat $(git rev-parse --show-cdup).git/refs/remotes/origin/HEAD | awk '{print $2}')
+diff_base=$(git symbolic-ref refs/remotes/origin/HEAD)
 
 # Extract branch name (without any trailing text, like the Chromium link)
 define_branchname="branchname=\\\$(echo {1} | cut -d' ' -f1)"
