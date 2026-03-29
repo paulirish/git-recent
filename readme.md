@@ -37,6 +37,28 @@ Type or use arrow keys to navigate your list of branches.
 
 Hit `ctrl-o` to see the branch diff.
 
+#### Worktree Support
+
+If a branch is already open in a separate git worktree, `git recent` will detect it and provide instructions to `cd` there. To enable **automatic** directory switching, add this wrapper function to your `.bashrc` or `.zshrc`:
+
+```bash
+# Optional wrapper to enable automatic worktree jumping
+git-recent() {
+  local output
+  # Set the flag to let the script know we can handle the CD
+  output=$(GIT_RECENT_AUTO_CD=1 command git-recent "$@")
+  
+  if echo "$output" | grep -q "^__CD__:"; then
+    local target=$(echo "$output" | grep "^__CD__:" | cut -d: -f2-)
+    cd "$target"
+    # Print the output but hide the control line
+    echo "$output" | grep -v "^__CD__:"
+  else
+    echo "$output"
+  fi
+}
+```
+
 --------------------------------
 
 # `git recent-og`

@@ -19,7 +19,7 @@ if [[ "$1" == "--help" ]]; then
   echo "git-recent: Browse and checkout recently used Git branches."
   echo
   echo "Keybindings:"
-  echo "  Enter:      Checkout the selected branch"
+  echo "  Enter:      Checkout the selected branch (or jump to its worktree if open elsewhere)"
   echo "  Ctrl-O:     Show the diff of the selected branch against the main/master branch"
   echo "  Ctrl-C:     Exit"
   exit 0
@@ -54,6 +54,24 @@ elif command -v xclip >/dev/null; then
 elif command -v xsel >/dev/null; then
   copy_cmd="printf '%s' {} | xsel --clipboard"
 fi
+
+_get_worktree_for_branch() {
+  local branch="$1"
+  local current_toplevel
+  current_toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
+
+  # Find the worktree path for the given branch, excluding the current one.
+  # Using substr to handle paths with spaces correctly.
+  git worktree list --porcelain | awk -v target="refs/heads/$branch" -v current="$current_toplevel" '
+    /^worktree / { wt = substr($0, 10) }
+    /^branch / && $2 == target {
+      if (wt != current) {
+        print wt
+        exit
+      }
+    }
+  '
+}
 
 YELLOW='\033[0;33m'
 DIM='\033[2m'
@@ -106,8 +124,20 @@ line_count=$(printf "%s" "$output" | wc -l)
 
 if [[ -n "$output" ]] && (( line_count == 0 )); then
   chosen_branch=$(echo "$output" | cut -d' ' -f1)
-  echo git checkout "$chosen_branch"
-  git checkout "$chosen_branch"
+
+  wt_path=$(_get_worktree_for_branch "$chosen_branch")
+
+  if [[ -n "$wt_path" ]]; then
+    echo "Branch '$chosen_branch' is open in worktree: $wt_path"
+    if [[ "$GIT_RECENT_AUTO_CD" == "1" ]]; then
+      echo "__CD__:$wt_path"
+    else
+      echo "To jump there, run: cd \"$wt_path\""
+    fi
+  else
+    echo git checkout "$chosen_branch"
+    git checkout "$chosen_branch"
+  fi
 else
   echo "$output"
 fi
