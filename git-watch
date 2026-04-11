@@ -59,13 +59,13 @@ update() {
     read -r last_head last_state_hash < "$state_file"
   fi
 
+  local did_something=false
+
   # 1. New commit detection
   if [[ "$current_head" != "$last_head" ]]; then
     echo -e "\n\033[1;34m=== Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
     git_run show --summary --stat -p
-    # Update state immediately to avoid showing diff that is now committed
-    echo "$current_head $current_state_hash" > "$state_file"
-    return
+    did_something=true
   fi
 
   # 2. Working directory detection
@@ -84,7 +84,11 @@ update() {
           git_run diff --no-index /dev/null "$f"
         fi
       done
+      did_something=true
     fi
+  fi
+
+  if [[ "$did_something" == "true" ]]; then
     echo "$current_head $current_state_hash" > "$state_file"
   fi
 }
@@ -110,8 +114,8 @@ if command -v watchexec >/dev/null 2>&1; then
   # -i .git: ignore most git internal changes
   # -w .: watch working directory
   # -w .git/HEAD: watch for commits
-  # --clear: optional? User said "streaming perspective", so probably NO clear.
-  watchexec -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step
+  # --quiet: suppress watchexec status messages
+  watchexec --quiet -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step
 else
   echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
   while true; do
