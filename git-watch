@@ -44,6 +44,7 @@ git_run() {
 hash_cmd=$(command -v shasum || command -v sha1sum || echo "cksum")
 
 update() {
+  local mode="$1"
   local git_dir state_file
   git_dir=$(git rev-parse --git-dir 2>/dev/null)
   [ -n "$git_dir" ] || return
@@ -55,21 +56,21 @@ update() {
   # Capture staged, unstaged, and the presence of untracked files
   current_state_hash=$( (git status --porcelain; git diff HEAD) | $hash_cmd | cut -d' ' -f1)
   
-  if [ -f "$state_file" ]; then
+  if [[ -f "$state_file" && "$mode" != "--initial" ]]; then
     read -r last_head last_state_hash < "$state_file"
   fi
 
   local did_something=false
 
-  # 1. New commit detection
-  if [[ "$current_head" != "$last_head" ]]; then
-    echo -e "\n\033[1;34m=== Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
+  # 1. Commit detection (or initial show)
+  if [[ "$current_head" != "$last_head" || "$mode" == "--initial" ]]; then
+    echo -e "\n\033[1;34m=== Current Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
     git_run show --summary --stat -p
     did_something=true
   fi
 
-  # 2. Working directory detection
-  if [[ "$current_state_hash" != "$last_state_hash" ]]; then
+  # 2. Working directory detection (or initial show)
+  if [[ "$current_state_hash" != "$last_state_hash" || "$mode" == "--initial" ]]; then
     local status=$(git status --porcelain)
     if [[ -n "$status" ]]; then
       echo -e "\n\033[1;32m=== Changes ===\033[0m"
@@ -95,19 +96,13 @@ update() {
 
 # Internal flag for watchexec to call back into the script
 if [[ "$1" == "--step" ]]; then
-  update
+  update "--step"
   exit 0
 fi
 
 # Main execution loop
-# Ensure state file is initialized so we don't dump the whole history on start
-# unless the user wants to see current changes.
-git_dir=$(git rev-parse --git-dir 2>/dev/null)
-state_file="$git_dir/watch-state"
-if [ ! -f "$state_file" ]; then
-    # On first run, we'll show current status if it's dirty
-    update
-fi
+# Always show the current state on launch
+update "--initial"
 
 if command -v watchexec >/dev/null 2>&1; then
   echo -e "\033[0;32mWatching with watchexec...\033[0m"
@@ -119,7 +114,7 @@ if command -v watchexec >/dev/null 2>&1; then
 else
   echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
   while true; do
-    update
+    update "--step"
     sleep 2
   done
 fi
