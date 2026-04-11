@@ -19,7 +19,10 @@
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   echo "git-watch: A streaming perspective of git changes and commits."
   echo
-  echo "Usage: git-watch"
+  echo "Usage: git-watch [--debug]"
+  echo
+  echo "Options:"
+  echo "  --debug     Log what would be run instead of running it"
   echo
   echo "Features:"
   echo "  - Shows 'git show' on new commits"
@@ -30,11 +33,20 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   exit 0
 fi
 
+DEBUG_MODE=false
+if [[ "$1" == "--debug" || "$2" == "--debug" ]]; then
+  DEBUG_MODE=true
+fi
+
 # Pager detection (compatible with delta, diff-so-fancy, etc.)
 pager_cmd=$(command -v delta || command -v diff-so-fancy)
 pipe_to_pager=${pager_cmd:+" | $pager_cmd"}
 
 git_run() {
+  if [ "$DEBUG_MODE" = true ]; then
+    echo -e "\033[0;35m[DEBUG] Would run: git --no-pager \"$@\" --color=always $pipe_to_pager\033[0m"
+    return
+  fi
   # Use --no-pager to avoid interactive sessions
   # Use --color=always to preserve color through the pipe
   eval "git --no-pager \"\$@\" --color=always $pipe_to_pager"
@@ -54,10 +66,18 @@ update() {
   current_head=$(git rev-parse HEAD 2>/dev/null)
   
   # Capture staged, unstaged, and the presence of untracked files
-  current_state_hash=$( (git status --porcelain; git diff HEAD) | $hash_cmd | cut -d' ' -f1)
+  local status_output=$(git status --porcelain)
+  local diff_output=$(git diff HEAD 2>/dev/null)
+  current_state_hash=$( (echo "$status_output"; echo "$diff_output") | $hash_cmd | cut -d' ' -f1)
   
   if [[ -f "$state_file" && "$mode" != "--initial" ]]; then
     read -r last_head last_state_hash < "$state_file"
+  fi
+
+  if [ "$DEBUG_MODE" = true ]; then
+    echo -e "\033[0;35m[DEBUG] Mode: $mode\033[0m"
+    echo -e "\033[0;35m[DEBUG] HEAD: $current_head (Last: $last_head)\033[0m"
+    echo -e "\033[0;35m[DEBUG] State Hash: $current_state_hash (Last: $last_state_hash)\033[0m"
   fi
 
   local did_something=false
@@ -71,8 +91,7 @@ update() {
 
   # 2. Working directory detection (or initial show)
   if [[ "$current_state_hash" != "$last_state_hash" || "$mode" == "--initial" ]]; then
-    local status=$(git status --porcelain)
-    if [[ -n "$status" ]]; then
+    if [[ -n "$status_output" ]]; then
       echo -e "\n\033[1;32m=== Changes ===\033[0m"
       
       # Show diff of tracked changes (staged and unstaged)
@@ -90,7 +109,11 @@ update() {
   fi
 
   if [[ "$did_something" == "true" ]]; then
-    echo "$current_head $current_state_hash" > "$state_file"
+    if [ "$DEBUG_MODE" = true ]; then
+      echo -e "\033[0;35m[DEBUG] Would update state file: $current_head $current_state_hash\033[0m"
+    else
+      echo "$current_head $current_state_hash" > "$state_file"
+    fi
   fi
 }
 
@@ -104,13 +127,18 @@ fi
 # Always show the current state on launch
 update "--initial"
 
+pass_debug=""
+if [ "$DEBUG_MODE" = true ]; then
+  pass_debug="--debug"
+fi
+
 if command -v watchexec >/dev/null 2>&1; then
   echo -e "\033[0;32mWatching with watchexec...\033[0m"
   # -i .git: ignore most git internal changes
   # -w .: watch working directory
   # -w .git/HEAD: watch for commits
   # --quiet: suppress watchexec status messages
-  watchexec --quiet -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step
+  watchexec --quiet -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
 else
   echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
   while true; do
