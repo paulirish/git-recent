@@ -7,7 +7,7 @@
 # - New commits (displays 'git show')
 # - Working directory & index changes (displays 'git diff HEAD' and untracked files)
 #
-# Prefers 'watchexec' for responsiveness but falls back to a loop.
+# Requires 'watchexec' for responsiveness.
 #
 
 # Check if we're in a git repo
@@ -15,6 +15,12 @@
   echo "Error: Not a git repository." >&2
   exit 1
 }
+
+# Check for dependencies
+if ! command -v watchexec >/dev/null 2>&1; then
+  echo "Error: 'watchexec' is required for git-watch. Please install it (e.g., 'brew install watchexec')." >&2
+  exit 1
+fi
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   echo "git-watch: A streaming perspective of git changes and commits."
@@ -27,8 +33,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   echo "Features:"
   echo "  - Shows 'git show' on new commits"
   echo "  - Shows 'git diff HEAD' on working tree/index changes"
-  echo "  - Shows content of new untracked files"
-  echo "  - Uses 'watchexec' if available for high-speed responsiveness"
+  echo "  - Uses 'watchexec' for high-speed responsiveness"
   echo "  - Uses your fancy pager (delta/diff-so-fancy) without blocking"
   exit 0
 fi
@@ -132,21 +137,8 @@ if [ "$DEBUG_MODE" = true ]; then
   pass_debug="--debug"
 fi
 
-if command -v watchexec >/dev/null 2>&1; then
-  echo -e "\033[0;32mWatching with watchexec...\033[0m"
-  # --postpone: don't run immediately on start (we already did update --initial)
-  # --quiet: suppress watchexec status messages
-  watchexec --quiet --postpone -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
-else
-  echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
-  while true; do
-    update "--step"
-    sleep 2
-  done
-fi
-  echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
-  while true; do
-    update "--step"
-    sleep 2
-  done
-fi
+echo -e "\033[0;32mWatching with watchexec...\033[0m"
+# --postpone: don't run immediately on start (we already did update --initial)
+# --quiet: suppress watchexec status messages
+# exec is used so that Ctrl-C goes directly to watchexec and terminates the session
+exec watchexec --quiet --postpone -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
