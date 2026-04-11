@@ -40,16 +40,19 @@ fi
 
 # Pager detection (compatible with delta, diff-so-fancy, etc.)
 pager_cmd=$(command -v delta || command -v diff-so-fancy)
-pipe_to_pager=${pager_cmd:+" | $pager_cmd"}
+if [ -n "$pager_cmd" ]; then
+  if [[ "$pager_cmd" == *"delta"* ]]; then
+    pager_cmd="$pager_cmd --paging=never"
+  fi
+  pipe_to_pager=" | $pager_cmd"
+fi
 
 git_run() {
   if [ "$DEBUG_MODE" = true ]; then
-    echo -e "\033[0;35m[DEBUG] Would run: git --no-pager \"$@\" --color=always $pipe_to_pager\033[0m"
+    echo -e "\033[0;35m[DEBUG] Would run: git --no-pager \"$@\" --color=always$pipe_to_pager\033[0m"
     return
   fi
-  # Use --no-pager to avoid interactive sessions
-  # Use --color=always to preserve color through the pipe
-  eval "git --no-pager \"\$@\" --color=always $pipe_to_pager"
+  eval "git --no-pager \"\$@\" --color=always$pipe_to_pager"
 }
 
 # Cross-platform hashing for change detection
@@ -65,10 +68,11 @@ update() {
   local current_head last_head current_state_hash last_state_hash
   current_head=$(git rev-parse HEAD 2>/dev/null)
   
-  # Capture staged, unstaged, and the presence of untracked files
+  # Capture status, diff, and untracked files for hashing
   local status_output=$(git status --porcelain)
   local diff_output=$(git diff HEAD 2>/dev/null)
-  current_state_hash=$( (echo "$status_output"; echo "$diff_output") | $hash_cmd | cut -d' ' -f1)
+  local untracked_files=$(git ls-files --others --exclude-standard)
+  current_state_hash=$( (echo "$status_output"; echo "$diff_output"; echo "$untracked_files") | $hash_cmd | cut -d' ' -f1)
   
   if [[ -f "$state_file" && "$mode" != "--initial" ]]; then
     read -r last_head last_state_hash < "$state_file"
@@ -76,38 +80,49 @@ update() {
 
   if [ "$DEBUG_MODE" = true ]; then
     echo -e "\033[0;35m[DEBUG] Mode: $mode\033[0m"
-    echo -e "\033[0;35m[DEBUG] HEAD: $current_head (Last: $last_head)\033[0m"
-    echo -e "\033[0;35m[DEBUG] State Hash: $current_state_hash (Last: $last_state_hash)\033[0m"
+    echo -e "\033[0;35m[DEBUG] HEAD: $current_head (Last: ${last_head:-NONE})\033[0m"
+    echo -e "\033[0;35m[DEBUG] State Hash: $current_state_hash (Last: ${last_state_hash:-NONE})\033[0m"
   fi
 
   local did_something=false
 
-  # 1. Commit detection (or initial show)
+  # 1. Commit detection
   if [[ "$current_head" != "$last_head" || "$mode" == "--initial" ]]; then
     echo -e "\n\033[1;34m=== Current Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
     git_run show --summary --stat -p
     did_something=true
   fi
 
-  # 2. Working directory detection (or initial show)
+  # 2. Working directory detection
   if [[ "$current_state_hash" != "$last_state_hash" || "$mode" == "--initial" ]]; then
     if [[ -n "$status_output" ]]; then
       echo -e "\n\033[1;32m=== Changes ===\033[0m"
       
-      # Show diff of tracked changes (staged and unstaged)
-      git_run diff HEAD
+      # Show diff of tracked changes
+      if [[ -n "$diff_output" ]]; then
+        git_run diff HEAD
+      fi
       
-      # Show untracked files content
-      git ls-files --others --exclude-standard | while read -r f; do
-        if [[ -f "$f" ]]; then
-          echo -e "\033[1;33m[Untracked: $f]\033[0m"
-          git_run diff --no-index /dev/null "$f"
+      # Untracked files handling
+      local count=$(echo "$untracked_files" | grep -c .)
+      if [[ $count -gt 0 ]]; then
+        if [[ $count -le 3 ]]; then
+          echo "$untracked_files" | while read -r f; do
+            if [[ -f "$f" ]]; then
+              echo -e "\033[1;33m[Untracked: $f]\033[0m"
+              git_run diff --no-index /dev/null "$f"
+            fi
+          done
+        else
+          echo -e "\033[1;33m[$count untracked files]\033[0m"
+          echo "$untracked_files" | sed 's/^/  /'
         fi
-      done
+      fi
       did_something=true
     fi
   fi
 
+  # Update state so we don't repeat this in the next --step
   if [[ "$did_something" == "true" ]]; then
     if [ "$DEBUG_MODE" = true ]; then
       echo -e "\033[0;35m[DEBUG] Would update state file: $current_head $current_state_hash\033[0m"
@@ -124,7 +139,6 @@ if [[ "$1" == "--step" ]]; then
 fi
 
 # Main execution loop
-# Always show the current state on launch
 update "--initial"
 
 pass_debug=""
@@ -134,12 +148,16 @@ fi
 
 if command -v watchexec >/dev/null 2>&1; then
   echo -e "\033[0;32mWatching with watchexec...\033[0m"
-  # -i .git: ignore most git internal changes
-  # -w .: watch working directory
-  # -w .git/HEAD: watch for commits
+  # --postpone: don't run immediately on start (we already did update --initial)
   # --quiet: suppress watchexec status messages
-  watchexec --quiet -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
+  watchexec --quiet --postpone -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
 else
+  echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
+  while true; do
+    update "--step"
+    sleep 2
+  done
+fi
   echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
   while true; do
     update "--step"
