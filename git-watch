@@ -68,11 +68,11 @@ update() {
   local current_head last_head current_state_hash last_state_hash
   current_head=$(git rev-parse HEAD 2>/dev/null)
   
-  # Capture status, diff, and untracked files for hashing
-  local status_output=$(git status --porcelain)
+  # Capture status and diff for hashing (ignoring untracked files for now)
+  local status_output=$(git status --porcelain --untracked-files=no)
   local diff_output=$(git diff HEAD 2>/dev/null)
-  local untracked_files=$(git ls-files --others --exclude-standard)
-  current_state_hash=$( (echo "$status_output"; echo "$diff_output"; echo "$untracked_files") | $hash_cmd | cut -d' ' -f1)
+  # TODO: Re-evaluate untracked file support later.
+  current_state_hash=$( (echo "$status_output"; echo "$diff_output") | $hash_cmd | cut -d' ' -f1)
   
   if [[ -f "$state_file" && "$mode" != "--initial" ]]; then
     read -r last_head last_state_hash < "$state_file"
@@ -103,21 +103,7 @@ update() {
         git_run diff HEAD
       fi
       
-      # Untracked files handling
-      local count=$(echo "$untracked_files" | grep -c .)
-      if [[ $count -gt 0 ]]; then
-        if [[ $count -le 3 ]]; then
-          echo "$untracked_files" | while read -r f; do
-            if [[ -f "$f" ]]; then
-              echo -e "\033[1;33m[Untracked: $f]\033[0m"
-              git_run diff --no-index /dev/null "$f"
-            fi
-          done
-        else
-          echo -e "\033[1;33m[$count untracked files]\033[0m"
-          echo "$untracked_files" | sed 's/^/  /'
-        fi
-      fi
+      # TODO: Implement surgical untracked file support here if needed.
       did_something=true
     fi
   fi
