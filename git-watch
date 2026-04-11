@@ -1,0 +1,121 @@
+#!/bin/bash
+
+#
+# git-watch: A streaming perspective of git changes and commits.
+#
+# Monitors the current repository for:
+# - New commits (displays 'git show')
+# - Working directory & index changes (displays 'git diff HEAD' and untracked files)
+#
+# Prefers 'watchexec' for responsiveness but falls back to a loop.
+#
+
+# Check if we're in a git repo
+[ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ] || {
+  echo "Error: Not a git repository." >&2
+  exit 1
+}
+
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+  echo "git-watch: A streaming perspective of git changes and commits."
+  echo
+  echo "Usage: git-watch"
+  echo
+  echo "Features:"
+  echo "  - Shows 'git show' on new commits"
+  echo "  - Shows 'git diff HEAD' on working tree/index changes"
+  echo "  - Shows content of new untracked files"
+  echo "  - Uses 'watchexec' if available for high-speed responsiveness"
+  echo "  - Uses your fancy pager (delta/diff-so-fancy) without blocking"
+  exit 0
+fi
+
+# Pager detection (compatible with delta, diff-so-fancy, etc.)
+pager_cmd=$(command -v delta || command -v diff-so-fancy)
+pipe_to_pager=${pager_cmd:+" | $pager_cmd"}
+
+git_run() {
+  # Use --no-pager to avoid interactive sessions
+  # Use --color=always to preserve color through the pipe
+  eval "git --no-pager \"\$@\" --color=always $pipe_to_pager"
+}
+
+# Cross-platform hashing for change detection
+hash_cmd=$(command -v shasum || command -v sha1sum || echo "cksum")
+
+update() {
+  local git_dir state_file
+  git_dir=$(git rev-parse --git-dir 2>/dev/null)
+  [ -n "$git_dir" ] || return
+  state_file="$git_dir/watch-state"
+
+  local current_head last_head current_state_hash last_state_hash
+  current_head=$(git rev-parse HEAD 2>/dev/null)
+  
+  # Capture staged, unstaged, and the presence of untracked files
+  current_state_hash=$( (git status --porcelain; git diff HEAD) | $hash_cmd | cut -d' ' -f1)
+  
+  if [ -f "$state_file" ]; then
+    read -r last_head last_state_hash < "$state_file"
+  fi
+
+  # 1. New commit detection
+  if [[ "$current_head" != "$last_head" ]]; then
+    echo -e "\n\033[1;34m=== Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
+    git_run show --summary --stat -p
+    # Update state immediately to avoid showing diff that is now committed
+    echo "$current_head $current_state_hash" > "$state_file"
+    return
+  fi
+
+  # 2. Working directory detection
+  if [[ "$current_state_hash" != "$last_state_hash" ]]; then
+    local status=$(git status --porcelain)
+    if [[ -n "$status" ]]; then
+      echo -e "\n\033[1;32m=== Changes ===\033[0m"
+      
+      # Show diff of tracked changes (staged and unstaged)
+      git_run diff HEAD
+      
+      # Show untracked files content
+      git ls-files --others --exclude-standard | while read -r f; do
+        if [[ -f "$f" ]]; then
+          echo -e "\033[1;33m[Untracked: $f]\033[0m"
+          git_run diff --no-index /dev/null "$f"
+        fi
+      done
+    fi
+    echo "$current_head $current_state_hash" > "$state_file"
+  fi
+}
+
+# Internal flag for watchexec to call back into the script
+if [[ "$1" == "--step" ]]; then
+  update
+  exit 0
+fi
+
+# Main execution loop
+# Ensure state file is initialized so we don't dump the whole history on start
+# unless the user wants to see current changes.
+git_dir=$(git rev-parse --git-dir 2>/dev/null)
+state_file="$git_dir/watch-state"
+if [ ! -f "$state_file" ]; then
+    # On first run, we'll show current status if it's dirty
+    update
+fi
+
+if command -v watchexec >/dev/null 2>&1; then
+  echo -e "\033[0;32mWatching with watchexec...\033[0m"
+  # -i .git: ignore most git internal changes
+  # -w .: watch working directory
+  # -w .git/HEAD: watch for commits
+  # --clear: optional? User said "streaming perspective", so probably NO clear.
+  watchexec -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step
+else
+  echo -e "\033[0;33mWatching with fallback loop (watchexec not found)...\033[0m"
+  while true; do
+    update
+    sleep 2
+  done
+fi
