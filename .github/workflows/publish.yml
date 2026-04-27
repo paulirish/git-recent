@@ -1,0 +1,24 @@
+name: Publish to npm
+on:
+  workflow_dispatch: # Allow manual triggering
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read  # Required for checkout
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm
+        run: |
+          npm install -g npm@latest
+          npm publish --provenance --access public --registry https://registry.npmjs.org/
