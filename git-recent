@@ -80,7 +80,7 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
-# if show_cl passed then also run git cl status. (chromium/gerrit/github repos)
+# if show_links passed we'll collect CL/PR info (gerrit/github repos) and add links in the TUI.
 [[ "$1" == "--cl" || "$1" == "-cl" || "$1" == "--pr" || "$1" == "-pr" ]] && show_links=true || show_links=false
 
 # if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
