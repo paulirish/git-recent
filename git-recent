@@ -106,8 +106,6 @@ _browse_branches() {
     gp=$(git config --get "gerrit.project" 2>/dev/null)
     if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
       ct="github"; cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
-    elif command -v git-cl >/dev/null 2>&1; then
-      ct="gerrit"; cs=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
     fi
   fi
 
