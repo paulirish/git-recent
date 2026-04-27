@@ -113,9 +113,16 @@ if [[ "$show_links" = true ]]; then
       [[ -z "$GERRIT_PROJECT" ]] && GERRIT_PROJECT=$(echo "$remote_url" | sed -E 's|sso://[^/]+/(.*)|\1|')
     elif [[ "$remote_url" == *.googlesource.com* ]]; then
       # Public Gerrit (like Chromium)
+      # e.g. https://chromium.googlesource.com/devtools/devtools-frontend.git
+      # Server: chromium-review.googlesource.com
+      # Project: devtools/devtools-frontend
       host_part=$(echo "$remote_url" | sed -E 's|https://([^/.]+)\.googlesource\.com.*|\1|')
       GERRIT_SERVER="$host_part-review.googlesource.com"
-      [[ -z "$GERRIT_PROJECT" ]] && GERRIT_PROJECT=$(echo "$remote_url" | sed -E 's|https://[^/]+/(.*)|\1|')
+      
+      if [[ -z "$GERRIT_PROJECT" ]]; then
+        # Extract project, removing leading / and trailing .git
+        GERRIT_PROJECT=$(echo "$remote_url" | sed -E "s|https://[^/]+/(.*)|\1|" | sed 's|\.git$||')
+      fi
     fi
   fi
   
@@ -168,12 +175,6 @@ _browse_branches() {
             # Use branch-specific server if available, otherwise fallback to inferred/global server
             branch_server=$(echo "$gc" | grep "branch\.${branch_name}\.gerritserver" | awk '{print $2}' | sed -E 's|https?://||')
             current_gs="${branch_server:-$gs}"
-            
-            # Special case: If we inferred an internal Google host but the config has a public one, 
-            # we prefer the internal one for better connectivity/UX.
-            if [[ "$gs" == *.git.corp.google.com && "$branch_server" == *.googlesource.com ]]; then
-              current_gs="$gs"
-            fi
 
             if [[ -n "$gp" ]]; then
               link_url="https://$current_gs/c/$gp/+/$cl_num"
