@@ -135,7 +135,7 @@ if [[ "$show_links" = true ]]; then
     CL_TYPE="github"
     # Fetch PRs for the current repo. headRefName, number, url
     # We include all states (open/merged/closed) but filter to @me to keep it fast and relevant.
-    CL_STATUS=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}' 2>/dev/null)
+    CL_STATUS=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
   fi
 fi
 
@@ -165,10 +165,11 @@ _browse_branches() {
             link_label="$cl_num"
           elif [[ -n "$CL_STATUS" ]]; then
             # Fallback to bulk CL_STATUS (Gerrit or GitHub)
-            link_info=$(echo "$CL_STATUS" | grep -F "${branch_name} :")
+            # We use ^ to ensure we match from the start of the line and handle potential multi-line matches by taking the first one.
+            link_info=$(echo "$CL_STATUS" | grep -E "^${branch_name} :" | head -n 1)
             if [[ -n "$link_info" ]]; then
               link_url=$(echo "$link_info" | grep -o -E 'https://[^ ]+')
-              # Extract number from end of URL
+              # Extract number from end of URL (handling GitHub /pull/123 or Gerrit /123)
               link_label=$(echo "$link_url" | grep -o -E '[0-9]+$')
               [[ "$CL_TYPE" == "github" ]] && link_label="#$link_label"
             fi
