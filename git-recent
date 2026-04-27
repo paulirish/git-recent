@@ -100,15 +100,26 @@ if [[ "$show_links" = true ]]; then
   # 1. Try Gerrit/git-cl configs (very fast, but only works if cl has been uploaded)
   GERRIT_CONFIGS=$(git config --get-regexp "branch\..*\.gerritissue" 2>/dev/null)
   GERRIT_SERVER=$(git config --get "gerritserver" 2>/dev/null)
+  GERRIT_PROJECT=$(git config --get "gerrit.project" 2>/dev/null)
+  
+  remote_url=$(git config --get remote.origin.url 2>/dev/null)
   
   if [[ -z "$GERRIT_SERVER" ]]; then
-    # Try to infer from remotes if it's a googlesource repo
-    remote_url=$(git config --get remote.origin.url 2>/dev/null)
-    if [[ "$remote_url" == *.googlesource.com* ]]; then
-      # e.g. https://chromium.googlesource.com/... -> chromium-review.googlesource.com
-      GERRIT_SERVER=$(echo "$remote_url" | sed -E 's|https://([^/.]+)\.googlesource\.com.*|\1-review.googlesource.com|')
+    if [[ "$remote_url" == sso://* ]]; then
+      # Internal Gerrit (Google)
+      host_part=$(echo "$remote_url" | sed -E 's|sso://([^/]+).*|\1|')
+      GERRIT_SERVER="$host_part-review.git.corp.google.com"
+      [[ -z "$GERRIT_PROJECT" ]] && GERRIT_PROJECT=$(echo "$remote_url" | sed -E 's|sso://[^/]+/(.*)|\1|')
+    elif [[ "$remote_url" == *.googlesource.com* ]]; then
+      # Public Gerrit (like Chromium)
+      host_part=$(echo "$remote_url" | sed -E 's|https://([^/.]+)\.googlesource\.com.*|\1|')
+      GERRIT_SERVER="$host_part-review.googlesource.com"
+      [[ -z "$GERRIT_PROJECT" ]] && GERRIT_PROJECT=$(echo "$remote_url" | sed -E 's|https://[^/]+/(.*)|\1|')
     fi
   fi
+  
+  # Strip protocol from GERRIT_SERVER if present
+  GERRIT_SERVER=$(echo "$GERRIT_SERVER" | sed -E 's|https?://||')
 
   # 2. Try bulk fetchers
   if command -v git-cl >/dev/null 2>&1 && git cl status --fast --no-branch-color >/dev/null 2>&1; then
@@ -145,7 +156,11 @@ _browse_branches() {
           # Check Gerrit configs first
           cl_num=$(echo "$GERRIT_CONFIGS" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
           if [[ -n "$cl_num" && -n "$GERRIT_SERVER" ]]; then
-            link_url="https://$GERRIT_SERVER/c/$cl_num"
+            if [[ -n "$GERRIT_PROJECT" ]]; then
+              link_url="https://$GERRIT_SERVER/c/$GERRIT_PROJECT/+/$cl_num"
+            else
+              link_url="https://$GERRIT_SERVER/c/$cl_num"
+            fi
             link_label="$cl_num"
           elif [[ -n "$CL_STATUS" ]]; then
             # Fallback to bulk CL_STATUS (Gerrit or GitHub)
