@@ -61,18 +61,6 @@ function recent
 end
 ```
 
-# `git watch`
-
-`git watch` provides a streaming perspective of changes and commits in your current branch. This is particularly useful for monitoring an automated coding agent or your own background work.
-
-    git watch
-
-- Displays `git show` when a new commit is made.
-- Displays `git diff` when tracked files are modified.
-- Displays full content of new untracked files.
-- Uses your configured pager (e.g. `delta` or `diff-so-fancy`) for formatting without blocking.
-- Uses `watchexec` for high responsiveness if available, or falls back to polling.
-
 --------------------------------
 
 # `git recent-og`
