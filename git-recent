@@ -134,7 +134,8 @@ if [[ "$show_links" = true ]]; then
   elif command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
     CL_TYPE="github"
     # Fetch PRs for the current repo. headRefName, number, url
-    CL_STATUS=$(gh pr list --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}' 2>/dev/null)
+    # We include all states (open/merged/closed) but filter to @me to keep it fast and relevant.
+    CL_STATUS=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}' 2>/dev/null)
   fi
 fi
 
