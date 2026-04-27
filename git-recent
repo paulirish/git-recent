@@ -143,6 +143,14 @@ fi
 WT_BRANCHES=$(git worktree list --porcelain | grep "^branch " | sed 's|^branch refs/heads/||')
 
 _browse_branches() {
+  # Pass variables into the function scope
+  local sl="$show_links"
+  local gc="$GERRIT_CONFIGS"
+  local gs="$GERRIT_SERVER"
+  local gp="$GERRIT_PROJECT"
+  local cs="$CL_STATUS"
+  local ct="$CL_TYPE"
+
   git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
         wt_symbol=""
@@ -153,25 +161,24 @@ _browse_branches() {
         link_label=""
         link_url=""
 
-        if [[ "$show_links" == true ]]; then
+        if [[ "$sl" == true ]]; then
           # Check Gerrit configs first
-          cl_num=$(echo "$GERRIT_CONFIGS" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
-          if [[ -n "$cl_num" && -n "$GERRIT_SERVER" ]]; then
-            if [[ -n "$GERRIT_PROJECT" ]]; then
-              link_url="https://$GERRIT_SERVER/c/$GERRIT_PROJECT/+/$cl_num"
+          cl_num=$(echo "$gc" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
+          if [[ -n "$cl_num" && -n "$gs" ]]; then
+            if [[ -n "$gp" ]]; then
+              link_url="https://$gs/c/$gp/+/$cl_num"
             else
-              link_url="https://$GERRIT_SERVER/c/$cl_num"
+              link_url="https://$gs/c/$cl_num"
             fi
             link_label="$cl_num"
-          elif [[ -n "$CL_STATUS" ]]; then
+          elif [[ -n "$cs" ]]; then
             # Fallback to bulk CL_STATUS (Gerrit or GitHub)
-            # We use ^ to ensure we match from the start of the line and handle potential multi-line matches by taking the first one.
-            link_info=$(echo "$CL_STATUS" | grep -E "^${branch_name} :" | head -n 1)
+            link_info=$(echo "$cs" | grep -F "${branch_name} :" | head -n 1)
             if [[ -n "$link_info" ]]; then
               link_url=$(echo "$link_info" | grep -o -E 'https://[^ ]+')
               # Extract number from end of URL (handling GitHub /pull/123 or Gerrit /123)
               link_label=$(echo "$link_url" | grep -o -E '[0-9]+$')
-              [[ "$CL_TYPE" == "github" ]] && link_label="#$link_label"
+              [[ "$ct" == "github" ]] && link_label="#$link_label"
             fi
           fi
         fi
