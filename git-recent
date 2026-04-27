@@ -32,7 +32,7 @@ fi
 
 # The HEAD of the primary branch (eg main or master or w/e), for diffing.
 # TODO: some branch mgmt approaches don't work well with this. And may prefer `git log --pretty=format:%H --merges -n 1`.  See https://github.com/paulirish/git-recent/issues/28
-diff_base=$(git symbolic-ref refs/remotes/origin/HEAD)
+diff_base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null || echo "HEAD")
 
 # Extract branch name (without any trailing text, like the Chromium link)
 define_branchname="branchname=\\\$(echo {1} | cut -d' ' -f1)"
@@ -102,7 +102,7 @@ _browse_branches() {
   local cs="" ct="" gs="" gp="" gc="" sl="$show_links"
   if [[ "$sl" == true ]]; then
     gc=$(git config --get-regexp "branch\..*\.gerrit" 2>/dev/null)
-    gs=$(git config --get "gerritserver" 2>/dev/null | sed -E 's|https?://||')
+    gs=$( (git config --get "gerrit.host" || git config --get "gerritserver") 2>/dev/null | sed -E 's|https?://||')
     gp=$(git config --get "gerrit.project" 2>/dev/null)
     if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
       ct="github"; cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
@@ -117,16 +117,30 @@ _browse_branches() {
           num=$(echo "$gc" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
           if [[ -n "$num" ]]; then
             srv=$(echo "$gc" | grep "branch\.${branch_name}\.gerritserver" | awk '{print $2}' | sed -E 's|https?://||')
-            url="https://${srv:-$gs}/c/${gp:+$gp/+/}$num"; label="$num"
-          elif info=$(echo "$cs" | grep -F "${branch_name} :" | head -n 1); then
-            url=$(echo "$info" | grep -o -E 'https://[^ ]+')
-            label=$(echo "$url" | grep -o -E '[0-9]+$')
-            [[ "$ct" == "github" ]] && label="#$label"
+            if [[ -n "$gp" ]]; then
+              url="https://${srv:-$gs}/c/$gp/+/$num"
+            else
+              url="https://${srv:-$gs}/c/$num"
+            fi
+            label="$num"
+          elif [[ -n "$cs" ]]; then
+             info=$(echo "$cs" | grep -F "${branch_name} :" | head -n 1)
+             if [[ -n "$info" ]]; then
+               url=$(echo "$info" | grep -o -E 'https://[^ ]+')
+               label=$(echo "$url" | grep -o -E '[0-9]+$')
+               [[ "$ct" == "github" ]] && label="#$label"
+             fi
           fi
         fi
 
         if [[ -n "$label" ]]; then
-          printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "$url" "$label"
+          # Clickable hyperlink: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
+          # We skip the hyperlink escape sequence if TERM=dumb (for easier testing/plain logs)
+          if [[ "$TERM" == "dumb" ]]; then
+            printf "$YELLOW%s$DIM%s %s ($url)$NC\n" "$branch_name" "$wt_symbol" "$label"
+          else
+            printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "$url" "$label"
+          fi
         else
           printf "$YELLOW%s$DIM%s$NC\n" "$branch_name" "$wt_symbol"
         fi
@@ -143,9 +157,11 @@ _browse_branches() {
         --bind "ctrl-o:preview:$diffbranch_cmd"
 }
 output="$(_browse_branches)"
+# If fzf returned a single branch in non-interactive mode (GIT_RECENT_QUERY set), 
+# it normally auto-checkouts. We detect if we should skip that for testing.
 line_count=$(printf "%s" "$output" | wc -l)
 
-if [[ -n "$output" ]] && (( line_count == 0 )); then
+if [[ -n "$output" ]] && (( line_count == 0 )) && [[ "$GIT_RECENT_TEST_NO_CHECKOUT" != "true" ]]; then
   chosen_branch=$(echo "$output" | cut -d' ' -f1)
 
   wt_path=$(_get_worktree_for_branch "$chosen_branch")
