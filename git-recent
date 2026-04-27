@@ -124,18 +124,8 @@ if [[ "$show_links" = true ]]; then
   # 2. Try bulk fetchers
   if command -v git-cl >/dev/null 2>&1 && git cl status --fast --no-branch-color >/dev/null 2>&1; then
     CL_TYPE="gerrit"
-    # Output format: (branch) : https://url (status)
-    CL_STATUS=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
-    
-    # If we didn't have a GERRIT_SERVER yet, try to grab it from one of the URLs in CL_STATUS
-    if [[ -z "$GERRIT_SERVER" ]]; then
-      GERRIT_SERVER=$(echo "$CL_STATUS" | grep -o -E 'https://[^/ ]+' | head -n 1 | sed 's|https://||')
-    fi
   elif command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
     CL_TYPE="github"
-    # Fetch PRs for the current repo. headRefName, number, url
-    # We include all states (open/merged/closed) but filter to @me to keep it fast and relevant.
-    CL_STATUS=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
   fi
 fi
 
@@ -148,8 +138,17 @@ _browse_branches() {
   local gc="$GERRIT_CONFIGS"
   local gs="$GERRIT_SERVER"
   local gp="$GERRIT_PROJECT"
-  local cs="$CL_STATUS"
+  local cs=""
   local ct="$CL_TYPE"
+
+  # Fetch CL_STATUS inside the function if links are enabled
+  if [[ "$sl" == true ]]; then
+    if [[ "$ct" == "gerrit" ]]; then
+       cs=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
+    elif [[ "$ct" == "github" ]]; then
+       cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
+    fi
+  fi
 
   git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
