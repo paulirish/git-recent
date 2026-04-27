@@ -1,0 +1,144 @@
+#!/bin/bash
+
+#
+# git-watch: A streaming perspective of git changes and commits.
+#
+# Monitors the current repository for:
+# - New commits (displays 'git show')
+# - Working directory & index changes (displays 'git diff HEAD' and untracked files)
+#
+# Requires 'watchexec' for responsiveness.
+#
+
+# Check if we're in a git repo
+[ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ] || {
+  echo "Error: Not a git repository." >&2
+  exit 1
+}
+
+# Check for dependencies
+if ! command -v watchexec >/dev/null 2>&1; then
+  echo "Error: 'watchexec' is required for git-watch. Please install it (e.g., 'brew install watchexec')." >&2
+  exit 1
+fi
+
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+  echo "git-watch: A streaming perspective of git changes and commits."
+  echo
+  echo "Usage: git-watch [--debug]"
+  echo
+  echo "Options:"
+  echo "  --debug     Log what would be run instead of running it"
+  echo
+  echo "Features:"
+  echo "  - Shows 'git show' on new commits"
+  echo "  - Shows 'git diff HEAD' on working tree/index changes"
+  echo "  - Uses 'watchexec' for high-speed responsiveness"
+  echo "  - Uses your fancy pager (delta/diff-so-fancy) without blocking"
+  exit 0
+fi
+
+DEBUG_MODE=false
+if [[ "$1" == "--debug" || "$2" == "--debug" ]]; then
+  DEBUG_MODE=true
+fi
+
+# Pager detection (compatible with delta, diff-so-fancy, etc.)
+pager_cmd=$(command -v delta || command -v diff-so-fancy)
+if [ -n "$pager_cmd" ]; then
+  if [[ "$pager_cmd" == *"delta"* ]]; then
+    pager_cmd="$pager_cmd --paging=never"
+  fi
+  pipe_to_pager=" | $pager_cmd"
+fi
+
+git_run() {
+  if [ "$DEBUG_MODE" = true ]; then
+    echo -e "\033[0;35m[DEBUG] Would run: git --no-pager \"$@\" --color=always$pipe_to_pager\033[0m"
+    return
+  fi
+  eval "git --no-pager \"\$@\" --color=always$pipe_to_pager"
+}
+
+# Cross-platform hashing for change detection
+hash_cmd=$(command -v shasum || command -v sha1sum || echo "cksum")
+
+update() {
+  local mode="$1"
+  local git_dir state_file
+  git_dir=$(git rev-parse --git-dir 2>/dev/null)
+  [ -n "$git_dir" ] || return
+  state_file="$git_dir/watch-state"
+
+  local current_head last_head current_state_hash last_state_hash
+  current_head=$(git rev-parse HEAD 2>/dev/null)
+  
+  # Capture status and diff for hashing (ignoring untracked files for now)
+  local status_output=$(git status --porcelain --untracked-files=no)
+  local diff_output=$(git diff HEAD 2>/dev/null)
+  # TODO: Re-evaluate untracked file support later.
+  current_state_hash=$( (echo "$status_output"; echo "$diff_output") | $hash_cmd | cut -d' ' -f1)
+  
+  if [[ -f "$state_file" && "$mode" != "--initial" ]]; then
+    read -r last_head last_state_hash < "$state_file"
+  fi
+
+  if [ "$DEBUG_MODE" = true ]; then
+    echo -e "\033[0;35m[DEBUG] Mode: $mode\033[0m"
+    echo -e "\033[0;35m[DEBUG] HEAD: $current_head (Last: ${last_head:-NONE})\033[0m"
+    echo -e "\033[0;35m[DEBUG] State Hash: $current_state_hash (Last: ${last_state_hash:-NONE})\033[0m"
+  fi
+
+  local did_something=false
+
+  # 1. Commit detection
+  if [[ "$current_head" != "$last_head" || "$mode" == "--initial" ]]; then
+    echo -e "\n\033[1;34m=== Current Commit: $(git log -1 --format='%h %s' 2>/dev/null) ===\033[0m"
+    git_run show --summary --stat -p
+    did_something=true
+  fi
+
+  # 2. Working directory detection
+  if [[ "$current_state_hash" != "$last_state_hash" || "$mode" == "--initial" ]]; then
+    if [[ -n "$status_output" ]]; then
+      echo -e "\n\033[1;32m=== Changes ===\033[0m"
+      
+      # Show diff of tracked changes
+      if [[ -n "$diff_output" ]]; then
+        git_run diff HEAD
+      fi
+      
+      # TODO: Implement surgical untracked file support here if needed.
+      did_something=true
+    fi
+  fi
+
+  # Update state so we don't repeat this in the next --step
+  if [[ "$did_something" == "true" ]]; then
+    if [ "$DEBUG_MODE" = true ]; then
+      echo -e "\033[0;35m[DEBUG] Would update state file: $current_head $current_state_hash\033[0m"
+    else
+      echo "$current_head $current_state_hash" > "$state_file"
+    fi
+  fi
+}
+
+# Internal flag for watchexec to call back into the script
+if [[ "$1" == "--step" ]]; then
+  update "--step"
+  exit 0
+fi
+
+# Main execution loop
+update "--initial"
+
+pass_debug=""
+if [ "$DEBUG_MODE" = true ]; then
+  pass_debug="--debug"
+fi
+
+echo -e "\033[0;32mWatching with watchexec...\033[0m"
+# --postpone: don't run immediately on start (we already did update --initial)
+# --quiet: suppress watchexec status messages
+# exec is used so that Ctrl-C goes directly to watchexec and terminates the session
+exec watchexec --quiet --postpone -i .git -w . -w "$(git rev-parse --git-dir)/HEAD" -- "$0" --step $pass_debug
