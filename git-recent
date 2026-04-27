@@ -19,7 +19,7 @@ if [[ "$1" == "--help" ]]; then
   echo "git-recent: Browse and checkout recently used Git branches."
   echo
   echo "Keybindings:"
-  echo "  Enter:      Checkout the selected branch"
+  echo "  Enter:      Checkout the selected branch (or jump to its worktree if open elsewhere)"
   echo "  Ctrl-O:     Show the diff of the selected branch against the main/master branch"
   echo "  Ctrl-C:     Exit"
   exit 0
@@ -55,6 +55,24 @@ elif command -v xsel >/dev/null; then
   copy_cmd="printf '%s' {} | xsel --clipboard"
 fi
 
+_get_worktree_for_branch() {
+  local branch="$1"
+  local current_toplevel
+  current_toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
+
+  # Find the worktree path for the given branch, excluding the current one.
+  # Using substr to handle paths with spaces correctly.
+  git worktree list --porcelain | awk -v target="refs/heads/$branch" -v current="$current_toplevel" '
+    /^worktree / { wt = substr($0, 10) }
+    /^branch / && $2 == target {
+      if (wt != current) {
+        print wt
+        exit
+      }
+    }
+  '
+}
+
 YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
@@ -77,18 +95,26 @@ filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 # Chromium hackers may want reference to their relevant CL.
 CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
 
+# List of branches currently checked out in any worktree (including the current one)
+WT_BRANCHES=$(git worktree list --porcelain | grep "^branch " | sed 's|^branch refs/heads/||')
+
 _browse_branches() {
   git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
+        wt_symbol=""
+        if echo "$WT_BRANCHES" | grep -qFx "$branch_name"; then
+          wt_symbol=" ⇶"
+        fi
+
         if [ "$show_cl" != true ]; then
-          printf "$YELLOW%s$NC\n" "$branch_name"
+          printf "$YELLOW%s$DIM%s$NC\n" "$branch_name" "$wt_symbol"
           continue
         fi
         review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
         # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
         # TODO: maybe get rid of the crrev.com/c/ text as the link?
         # TODO: use `git config branch.$(git rev-parse --abbrev-ref HEAD).gerritissue` and gerritserver to avoid using `git cl status`
-        printf "$YELLOW%s $DIM\033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "https://$review_url" "$review_url"
+        printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "https://$review_url" "$review_url"
       done \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
@@ -106,8 +132,16 @@ line_count=$(printf "%s" "$output" | wc -l)
 
 if [[ -n "$output" ]] && (( line_count == 0 )); then
   chosen_branch=$(echo "$output" | cut -d' ' -f1)
-  echo git checkout "$chosen_branch"
-  git checkout "$chosen_branch"
+
+  wt_path=$(_get_worktree_for_branch "$chosen_branch")
+
+  if [[ -n "$wt_path" ]]; then
+    echo "Branch '$chosen_branch' is open in worktree: $wt_path" >&2
+    echo "$wt_path"
+  else
+    echo "git checkout $chosen_branch" >&2
+    git checkout "$chosen_branch"
+  fi
 else
   echo "$output"
 fi

@@ -4,7 +4,8 @@
   "description": "List recent git branches, select one for checkout. See branch commits and diffs, all formatted so fancy",
   "bin": {
     "git-recent": "git-recent",
-    "git-recent-og": "git-recent-og"
+    "git-recent-og": "git-recent-og",
+    "git-watch": "git-watch"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
