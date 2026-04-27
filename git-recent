@@ -100,12 +100,26 @@ if [[ "$show_links" = true ]]; then
   # 1. Try Gerrit/git-cl configs (very fast, but only works if cl has been uploaded)
   GERRIT_CONFIGS=$(git config --get-regexp "branch\..*\.gerritissue" 2>/dev/null)
   GERRIT_SERVER=$(git config --get "gerritserver" 2>/dev/null)
+  
+  if [[ -z "$GERRIT_SERVER" ]]; then
+    # Try to infer from remotes if it's a googlesource repo
+    remote_url=$(git config --get remote.origin.url 2>/dev/null)
+    if [[ "$remote_url" == *.googlesource.com* ]]; then
+      # e.g. https://chromium.googlesource.com/... -> chromium-review.googlesource.com
+      GERRIT_SERVER=$(echo "$remote_url" | sed -E 's|https://([^/.]+)\.googlesource\.com.*|\1-review.googlesource.com|')
+    fi
+  fi
 
   # 2. Try bulk fetchers
   if command -v git-cl >/dev/null 2>&1 && git cl status --fast --no-branch-color >/dev/null 2>&1; then
     CL_TYPE="gerrit"
     # Output format: (branch) : https://url (status)
     CL_STATUS=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
+    
+    # If we didn't have a GERRIT_SERVER yet, try to grab it from one of the URLs in CL_STATUS
+    if [[ -z "$GERRIT_SERVER" ]]; then
+      GERRIT_SERVER=$(echo "$CL_STATUS" | grep -o -E 'https://[^/ ]+' | head -n 1 | sed 's|https://||')
+    fi
   elif command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
     CL_TYPE="github"
     # Fetch PRs for the current repo. headRefName, number, url
@@ -130,9 +144,8 @@ _browse_branches() {
         if [[ "$show_links" == true ]]; then
           # Check Gerrit configs first
           cl_num=$(echo "$GERRIT_CONFIGS" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
-          if [[ -n "$cl_num" ]]; then
-            server=${GERRIT_SERVER:-"chromium-review.googlesource.com"}
-            link_url="https://$server/c/$cl_num"
+          if [[ -n "$cl_num" && -n "$GERRIT_SERVER" ]]; then
+            link_url="https://$GERRIT_SERVER/c/$cl_num"
             link_label="$cl_num"
           elif [[ -n "$CL_STATUS" ]]; then
             # Fallback to bulk CL_STATUS (Gerrit or GitHub)
