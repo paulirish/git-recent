@@ -122,10 +122,10 @@ if [[ "$show_links" = true ]]; then
   GERRIT_SERVER=$(echo "$GERRIT_SERVER" | sed -E 's|https?://||')
 
   # 2. Try bulk fetchers
-  if command -v git-cl >/dev/null 2>&1 && git cl status --fast --no-branch-color >/dev/null 2>&1; then
-    CL_TYPE="gerrit"
-  elif command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
+  if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
     CL_TYPE="github"
+  elif command -v git-cl >/dev/null 2>&1 && [[ "$remote_url" == *.googlesource.com* || -n "$GERRIT_SERVER" ]]; then
+    CL_TYPE="gerrit"
   fi
 fi
 
