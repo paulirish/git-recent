@@ -96,107 +96,39 @@ NC='\033[0m' # No Color
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
 # Chromium/Gerrit/GitHub hackers may want reference to their relevant CL/PR.
-if [[ "$show_links" = true ]]; then
-  # 1. Try Gerrit/git-cl configs (very fast, but only works if cl has been uploaded)
-  # We fetch all gerrit-related configs for branches to avoid multiple git calls.
-  GERRIT_CONFIGS=$(git config --get-regexp "branch\..*\.gerrit" 2>/dev/null)
-  GERRIT_SERVER=$(git config --get "gerritserver" 2>/dev/null)
-  GERRIT_PROJECT=$(git config --get "gerrit.project" 2>/dev/null)
-  
-  remote_url=$(git config --get remote.origin.url 2>/dev/null)
-  
-  if [[ -z "$GERRIT_SERVER" ]]; then
-    if [[ "$remote_url" == sso://* ]]; then
-      # Internal Gerrit (Google)
-      host_part=$(echo "$remote_url" | sed -E 's|sso://([^/]+).*|\1|')
-      GERRIT_SERVER="$host_part-review.git.corp.google.com"
-      [[ -z "$GERRIT_PROJECT" ]] && GERRIT_PROJECT=$(echo "$remote_url" | sed -E 's|sso://[^/]+/(.*)|\1|')
-    elif [[ "$remote_url" == *.googlesource.com* ]]; then
-      # Public Gerrit (like Chromium)
-      # e.g. https://chromium.googlesource.com/devtools/devtools-frontend.git
-      # Server: chromium-review.googlesource.com
-      # Project: devtools/devtools-frontend
-      host_part=$(echo "$remote_url" | sed -E 's|https://([^/.]+)\.googlesource\.com.*|\1|')
-      GERRIT_SERVER="$host_part-review.googlesource.com"
-      
-      if [[ -z "$GERRIT_PROJECT" ]]; then
-        # Extract project, removing leading / and trailing .git
-        GERRIT_PROJECT=$(echo "$remote_url" | sed -E "s|https://[^/]+/(.*)|\1|" | sed 's|\.git$||')
-      fi
-    fi
-  fi
-  
-  # Strip protocol from GERRIT_SERVER if present
-  GERRIT_SERVER=$(echo "$GERRIT_SERVER" | sed -E 's|https?://||')
-
-  # 2. Try bulk fetchers
-  if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
-    CL_TYPE="github"
-  elif command -v git-cl >/dev/null 2>&1 && [[ "$remote_url" == *.googlesource.com* || -n "$GERRIT_SERVER" ]]; then
-    CL_TYPE="gerrit"
-  fi
-fi
-
-# List of branches currently checked out in any worktree (including the current one)
 WT_BRANCHES=$(git worktree list --porcelain | grep "^branch " | sed 's|^branch refs/heads/||')
 
 _browse_branches() {
-  # Pass variables into the function scope
-  local sl="$show_links"
-  local gc="$GERRIT_CONFIGS"
-  local gs="$GERRIT_SERVER"
-  local gp="$GERRIT_PROJECT"
-  local cs=""
-  local ct="$CL_TYPE"
-
-  # Fetch CL_STATUS inside the function if links are enabled
+  local cs="" ct="" gs="" gp="" gc="" sl="$show_links"
   if [[ "$sl" == true ]]; then
-    if [[ "$ct" == "gerrit" ]]; then
-       cs=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
-    elif [[ "$ct" == "github" ]]; then
-       cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
+    gc=$(git config --get-regexp "branch\..*\.gerrit" 2>/dev/null)
+    gs=$(git config --get "gerritserver" 2>/dev/null | sed -E 's|https?://||')
+    gp=$(git config --get "gerrit.project" 2>/dev/null)
+    if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
+      ct="github"; cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
+    elif command -v git-cl >/dev/null 2>&1; then
+      ct="gerrit"; cs=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
     fi
   fi
 
   git for-each-ref --sort=-authordate "$heads" --format="%(refname:short)" \
     | while read -r branch_name; do
-        wt_symbol=""
-        if echo "$WT_BRANCHES" | grep -qFx "$branch_name"; then
-          wt_symbol=" ⇶"
-        fi
-
-        link_label=""
-        link_url=""
-
+        wt_symbol=""; [[ "$WT_BRANCHES" == *"$branch_name"* ]] && wt_symbol=" ⇶"
+        label="" url=""
         if [[ "$sl" == true ]]; then
-          # Check Gerrit configs first
-          cl_num=$(echo "$gc" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
-          if [[ -n "$cl_num" ]]; then
-            # Use branch-specific server if available, otherwise fallback to inferred/global server
-            branch_server=$(echo "$gc" | grep "branch\.${branch_name}\.gerritserver" | awk '{print $2}' | sed -E 's|https?://||')
-            current_gs="${branch_server:-$gs}"
-
-            if [[ -n "$gp" ]]; then
-              link_url="https://$current_gs/c/$gp/+/$cl_num"
-            else
-              link_url="https://$current_gs/c/$cl_num"
-            fi
-            link_label="$cl_num"
-          elif [[ -n "$cs" ]]; then
-            # Fallback to bulk CL_STATUS (Gerrit or GitHub)
-            link_info=$(echo "$cs" | grep -F "${branch_name} :" | head -n 1)
-            if [[ -n "$link_info" ]]; then
-              link_url=$(echo "$link_info" | grep -o -E 'https://[^ ]+')
-              # Extract number from end of URL (handling GitHub /pull/123 or Gerrit /123)
-              link_label=$(echo "$link_url" | grep -o -E '[0-9]+$')
-              [[ "$ct" == "github" ]] && link_label="#$link_label"
-            fi
+          num=$(echo "$gc" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
+          if [[ -n "$num" ]]; then
+            srv=$(echo "$gc" | grep "branch\.${branch_name}\.gerritserver" | awk '{print $2}' | sed -E 's|https?://||')
+            url="https://${srv:-$gs}/c/${gp:+$gp/+/}$num"; label="$num"
+          elif info=$(echo "$cs" | grep -F "${branch_name} :" | head -n 1); then
+            url=$(echo "$info" | grep -o -E 'https://[^ ]+')
+            label=$(echo "$url" | grep -o -E '[0-9]+$')
+            [[ "$ct" == "github" ]] && label="#$label"
           fi
         fi
 
-        if [[ -n "$link_label" ]]; then
-          # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
-          printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "$link_url" "$link_label"
+        if [[ -n "$label" ]]; then
+          printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "$url" "$label"
         else
           printf "$YELLOW%s$DIM%s$NC\n" "$branch_name" "$wt_symbol"
         fi
