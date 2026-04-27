@@ -18,6 +18,9 @@ fi
 if [[ "$1" == "--help" ]]; then
   echo "git-recent: Browse and checkout recently used Git branches."
   echo
+  echo "Options:"
+  echo "  --cl, --pr  Show Gerrit CL or GitHub PR links next to branches"
+  echo
   echo "Keybindings:"
   echo "  Enter:      Checkout the selected branch (or jump to its worktree if open elsewhere)"
   echo "  Ctrl-O:     Show the diff of the selected branch against the main/master branch"
@@ -77,11 +80,11 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
-# if show_cl passed then also run git cl status. (chromium repos)
-[[ "$1" == "--cl" || "$1" == "-cl" ]] && show_cl=true || show_cl=false
+# if show_cl passed then also run git cl status. (chromium/gerrit/github repos)
+[[ "$1" == "--cl" || "$1" == "-cl" || "$1" == "--pr" || "$1" == "-pr" ]] && show_links=true || show_links=false
 
 # if extra arg passed (eg `git recent remotename`), then list those remote branches, rather than local ones
-[[ -n "$1" && "$show_cl" != true ]] && heads="refs/remotes/$1" || heads="refs/heads"
+[[ -n "$1" && "$show_links" != true ]] && heads="refs/remotes/$1" || heads="refs/heads"
 
 
 # fzf git inspiration:
@@ -92,8 +95,23 @@ NC='\033[0m' # No Color
 # If there's a GIT_RECENT_QUERY environment variable, use it for non-interactive filtering. (Primarily added for testing: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/g/git-recent.rb#L41-L46)
 filterarg=${GIT_RECENT_QUERY:+"--filter=$GIT_RECENT_QUERY"}
 
-# Chromium hackers may want reference to their relevant CL.
-CL_STATUS=$([ "$show_cl" = true ] && git cl status --fast --no-branch-color | grep 'https://' | sed 's| (.*||')
+# Chromium/Gerrit/GitHub hackers may want reference to their relevant CL/PR.
+if [[ "$show_links" = true ]]; then
+  # 1. Try Gerrit/git-cl configs (very fast, but only works if cl has been uploaded)
+  GERRIT_CONFIGS=$(git config --get-regexp "branch\..*\.gerritissue" 2>/dev/null)
+  GERRIT_SERVER=$(git config --get "gerritserver" 2>/dev/null)
+
+  # 2. Try bulk fetchers
+  if command -v git-cl >/dev/null 2>&1 && git cl status --fast --no-branch-color >/dev/null 2>&1; then
+    CL_TYPE="gerrit"
+    # Output format: (branch) : https://url (status)
+    CL_STATUS=$(git cl status --fast --no-branch-color 2>/dev/null | grep 'https://' | sed 's| (.*||')
+  elif command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
+    CL_TYPE="github"
+    # Fetch PRs for the current repo. headRefName, number, url
+    CL_STATUS=$(gh pr list --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}' 2>/dev/null)
+  fi
+fi
 
 # List of branches currently checked out in any worktree (including the current one)
 WT_BRANCHES=$(git worktree list --porcelain | grep "^branch " | sed 's|^branch refs/heads/||')
@@ -106,15 +124,34 @@ _browse_branches() {
           wt_symbol=" ⇶"
         fi
 
-        if [ "$show_cl" != true ]; then
-          printf "$YELLOW%s$DIM%s$NC\n" "$branch_name" "$wt_symbol"
-          continue
+        link_label=""
+        link_url=""
+
+        if [[ "$show_links" == true ]]; then
+          # Check Gerrit configs first
+          cl_num=$(echo "$GERRIT_CONFIGS" | grep "branch\.${branch_name}\.gerritissue" | awk '{print $2}')
+          if [[ -n "$cl_num" ]]; then
+            server=${GERRIT_SERVER:-"chromium-review.googlesource.com"}
+            link_url="https://$server/c/$cl_num"
+            link_label="$cl_num"
+          elif [[ -n "$CL_STATUS" ]]; then
+            # Fallback to bulk CL_STATUS (Gerrit or GitHub)
+            link_info=$(echo "$CL_STATUS" | grep -F "${branch_name} :")
+            if [[ -n "$link_info" ]]; then
+              link_url=$(echo "$link_info" | grep -o -E 'https://[^ ]+')
+              # Extract number from end of URL
+              link_label=$(echo "$link_url" | grep -o -E '[0-9]+$')
+              [[ "$CL_TYPE" == "github" ]] && link_label="#$link_label"
+            fi
+          fi
         fi
-        review_url=$(echo "$CL_STATUS" | grep -E "\b${branch_name} :" | grep -o -E 'https://.*' | sed 's|https://||')
-        # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
-        # TODO: maybe get rid of the crrev.com/c/ text as the link?
-        # TODO: use `git config branch.$(git rev-parse --abbrev-ref HEAD).gerritissue` and gerritserver to avoid using `git cl status`
-        printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "https://$review_url" "$review_url"
+
+        if [[ -n "$link_label" ]]; then
+          # Using fancy integrated hyperlinks: https://iterm2.com/feature-reporting/Hyperlinks_in_Terminal_Emulators.html
+          printf "$YELLOW%s$DIM%s \033]8;;%s\a%s\033]8;;\a$NC\n" "$branch_name" "$wt_symbol" "$link_url" "$link_label"
+        else
+          printf "$YELLOW%s$DIM%s$NC\n" "$branch_name" "$wt_symbol"
+        fi
       done \
     | fzf  \
         $filterarg --ansi -- --layout=reverse --multi --height=90% --min-height=20  \
