@@ -104,7 +104,8 @@ _browse_branches() {
     gc=$(git config --get-regexp "branch\..*\.gerrit" 2>/dev/null)
     gs=$( (git config --get "gerrit.host" || git config --get "gerritserver") 2>/dev/null | sed -E 's|https?://||')
     gp=$(git config --get "gerrit.project" 2>/dev/null)
-    if command -v gh >/dev/null 2>&1 && git remote -v | grep -q "github.com"; then
+    local rems=$(git remote -v 2>/dev/null)
+    if [[ "$rems" == *"github.com"* ]] && command -v gh >/dev/null 2>&1; then
       ct="github"; cs=$(gh pr list --state all --author "@me" --limit 100 --json headRefName,number,url --template '{{range .}}{{ .headRefName }} : {{ .url }} {{ .number }}{{"\n"}}{{end}}')
     fi
   fi
